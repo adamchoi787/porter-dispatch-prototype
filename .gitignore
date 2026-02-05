@@ -1,0 +1,15 @@
+# --- Python Internals (Junk files) ---
+__pycache__/
+*.pyc
+
+# --- Security (NEVER upload these) ---
+.env
+.DS_Store
+
+# --- Virtual Environment ---
+.venv/
+venv/
+env/
+
+# --- IDE Settings (Optional) ---
+.vscode/

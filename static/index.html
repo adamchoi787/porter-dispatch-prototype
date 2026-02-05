@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Porter Dispatch MVP</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8 font-sans">
+    <div class="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
+        
+        <div class="md:col-span-1 bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-2xl font-bold mb-4 border-b pb-2">Porter Status</h2>
+            <div id="porter-status-list" class="space-y-4">
+                <p class="text-gray-500">Loading...</p>
+            </div>
+            <button id="refresh-status-btn" class="mt-4 w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600">
+                Refresh Status
+            </button>
+        </div>
+        
+        <div class="md:col-span-2 bg-white p-6 rounded-lg shadow-md">
+            <h1 class="text-3xl font-bold mb-6">Porter Dispatch Prototype</h1>
+            
+            <div class="space-y-4">
+                <div>
+                    <label for="task-input" class="block text-sm font-medium text-gray-700">New Task Request (Natural Language)</label>
+                    <textarea id="task-input" rows="3" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></textarea>
+                </div>
+                
+                <button id="dispatch-btn" class="w-full bg-green-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-green-700">
+                    Dispatch Task
+                </button>
+                
+                <div class="pt-4">
+                    <h3 class="text-lg font-medium">Quick Tasks (Examples)</h3>
+                    <div class="flex flex-wrap gap-2 mt-2">
+                        <button class="quick-task bg-gray-200 p-2 rounded-lg text-sm hover:bg-gray-300">urgent patient 7H to 3FXRAY</button>
+                        <button class="quick-task bg-gray-200 p-2 rounded-lg text-sm hover:bg-gray-300">specimen from lab to A&D</button>
+                        <button class="quick-task bg-gray-200 p-2 rounded-lg text-sm hover:bg-gray-300">body from 6H to mortuary, immediate</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="response-area" class="mt-6 p-4 bg-gray-50 rounded-lg border hidden">
+                <h3 class="text-lg font-medium text-gray-900 mb-2" id="response-title">Dispatch Result</h3>
+                <pre id="response-json" class="text-sm bg-gray-900 text-white p-4 rounded-md overflow-x-auto"></pre>
+            </div>
+        </div>
+        
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const taskInput = document.getElementById('task-input');
+            const dispatchBtn = document.getElementById('dispatch-btn');
+            const responseArea = document.getElementById('response-area');
+            const responseTitle = document.getElementById('response-title');
+            const responseJson = document.getElementById('response-json');
+            const quickTaskBtns = document.querySelectorAll('.quick-task');
+            const statusList = document.getElementById('porter-status-list');
+            const refreshBtn = document.getElementById('refresh-status-btn');
+
+            // --- Status Fetching Logic ---
+            const fetchStatus = async () => {
+                try {
+                    statusList.innerHTML = '<p class="text-gray-500">Loading...</p>';
+                    
+                    const response = await fetch('/status');
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    
+                    const data = await response.json();
+                    
+                    statusList.innerHTML = ''; // Clear current list
+                    
+                    data.porters.forEach(porter => {
+                        const isAvailable = porter.status === 'available';
+                        const statusColor = isAvailable ? 'text-green-600' : 'text-red-600';
+                        const bgColor = isAvailable ? 'bg-green-50' : 'bg-red-50';
+                        
+                        const porterEl = document.createElement('div');
+                        // *** FIX was here: removed \ from `${bgColor}` ***
+                        porterEl.className = `p-3 rounded-lg border ${bgColor}`; 
+                        
+                        // *** FIX was here: removed \ from all `${...}` variables ***
+                        porterEl.innerHTML = `
+                            <div class="flex justify-between items-center">
+                                <span class="font-bold text-lg">${porter.id}</span>
+                                <span class="font-medium ${statusColor}">${porter.status.toUpperCase()}</span>
+                            </div>
+                            <div class="text-sm text-gray-600">Location: ${porter.location}</div>
+                            <div class="text-sm text-gray-600">Task: ${porter.task}</div>
+                        `;
+                        statusList.appendChild(porterEl);
+                    });
+
+                    // Update queue length
+                    const queueEl = document.createElement('div');
+                    queueEl.className = 'mt-4 pt-4 border-t';
+                    queueEl.innerHTML = `
+                        <div class="font-bold text-lg">Task Queue</div>
+                        <div class="text-gray-700">Pending Tasks: ${data.queue_length}</div>
+                    `;
+                    statusList.appendChild(queueEl);
+
+                } catch (error) {
+                    console.error('Error fetching status:', error);
+                    statusList.innerHTML = '<p class="text-red-500">Error loading status.</p>';
+                }
+            };
+            
+            // --- Dispatch Logic ---
+            const handleDispatch = async () => {
+                const requestText = taskInput.value;
+                if (!requestText) {
+                    alert('Please enter a task request.');
+                    return;
+                }
+                
+                dispatchBtn.disabled = true;
+                dispatchBtn.textContent = 'Dispatching...';
+                responseArea.classList.add('hidden');
+                
+                try {
+                    const response = await fetch('/dispatch', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ request: requestText })
+                    });
+                    
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    const data = await response.json();
+                    
+                    // *** FIX was here: removed \ from `${data.status}` ***
+                    responseTitle.textContent = `Result: ${data.status}`;
+                    responseJson.textContent = JSON.stringify(data, null, 2);
+                    responseArea.classList.remove('hidden');
+                    
+                    if(data.status === "Task Assigned") {
+                        responseArea.classList.remove('border-red-300', 'bg-red-50');
+                        responseArea.classList.add('border-green-300', 'bg-green-50');
+                    } else {
+                        responseArea.classList.remove('border-green-300', 'bg-green-50');
+                        responseArea.classList.add('border-red-300', 'bg-red-50');
+                    }
+                    
+                    // Refresh status after dispatch
+                    fetchStatus();
+
+                } catch (error) {
+                    console.error('Error dispatching task:', error);
+                    responseTitle.textContent = 'Error';
+                    responseJson.textContent = error.toString();
+                    responseArea.classList.remove('hidden');
+                    responseArea.classList.add('border-red-300', 'bg-red-50');
+                } finally {
+                    dispatchBtn.disabled = false;
+                    dispatchBtn.textContent = 'Dispatch Task';
+                }
+            };
+
+            dispatchBtn.addEventListener('click', handleDispatch);
+            refreshBtn.addEventListener('click', fetchStatus);
+            
+            quickTaskBtns.forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    taskInput.value = e.target.textContent;
+                    handleDispatch(); // Auto-dispatch on click
+                });
+            });
+            
+            // Initial load
+            fetchStatus();
+        });
+    </script>
+</body>
+</html>
