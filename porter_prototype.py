@@ -63,13 +63,19 @@ class ChatGPTLLM:
     Uses the OpenAI API (ChatGPT) to parse user requests.
     """
     def __init__(self):
+        # 1. Load the key (Ensure this is your DEEPSEEK key, not the sk-proj... one)
         self.api_key = os.environ.get("OPENAI_API_KEY")
         if not self.api_key:
-            raise ValueError("OPENAI_API_KEY environment variable not set. Please set it before running.")
+            raise ValueError("OPENAI_API_KEY environment variable not set.")
         
-        self.client = openai.OpenAI(api_key=self.api_key)
+        # 2. Initialize the client with the DeepSeek URL
+        self.client = openai.OpenAI(
+            api_key=self.api_key, 
+            base_url="https://api.deepseek.com"  # <--- THIS LINE IS CRITICAL
+        )
+        
         self.system_prompt = self._build_system_prompt()
-        print("ChatGPTLLM Initialized.")
+        print("ChatGPTLLM Initialized (using DeepSeek).")
 
     def _build_system_prompt(self):
         """Creates the detailed instruction prompt for the AI."""
@@ -104,7 +110,7 @@ class ChatGPTLLM:
         
         try:
             response = self.client.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model="deepseek-chat",
                 messages=[
                     {"role": "system", "content": self.system_prompt},
                     {"role": "user", "content": user_request}
