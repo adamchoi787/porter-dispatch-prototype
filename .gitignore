@@ -2,7 +2,7 @@
 __pycache__/
 *.pyc
 
-# --- Security (NEVER upload these) ---
+# --- Security  ---
 .env
 .DS_Store
 
