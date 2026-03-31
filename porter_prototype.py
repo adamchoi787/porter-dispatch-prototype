@@ -2,10 +2,43 @@ import json
 import time
 import os
 import openai
-import traceback  # <-- Added for better error messages
+import traceback
+import threading
+from datetime import datetime, timedelta
+import pandas as pd
+from solver import PorterDispatchSolver
 
 # --- Step 1: The "Map" (Data Foundation) ---
-TRAVEL_TIME_MATRIX = {
+def load_travel_matrix(xlsx_path):
+    """Load the 89x89 travel time matrix from travel_times.xlsx (Travel_Times_P75 sheet)."""
+    try:
+        df = pd.read_excel(xlsx_path, sheet_name='Travel_Times_P75', index_col=0)
+        matrix = {}
+        for loc_from in df.index:
+            matrix[loc_from] = {}
+            for loc_to in df.columns:
+                val = df.loc[loc_from, loc_to]
+                if isinstance(val, str) and ':' in val:
+                    # Parse HH:MM:SS format to minutes
+                    parts = val.split(':')
+                    h, m, s = int(parts[0]), int(parts[1]), int(parts[2])
+                    matrix[loc_from][loc_to] = h * 60 + m + s / 60.0
+                elif val == 0 or val == '0':
+                    matrix[loc_from][loc_to] = 0.0
+                else:
+                    # Handle timedelta or numeric values
+                    try:
+                        matrix[loc_from][loc_to] = float(val.total_seconds() / 60) if hasattr(val, 'total_seconds') else float(val)
+                    except:
+                        matrix[loc_from][loc_to] = 27.5  # p90 fallback
+        print(f"[Matrix] Loaded {len(matrix)} x {len(df.columns)} travel matrix from {xlsx_path}")
+        return matrix
+    except Exception as e:
+        print(f"[Matrix] Error loading travel matrix: {e}. Using fallback 9-location matrix.")
+        return TRAVEL_TIME_MATRIX_FALLBACK
+
+# Fallback hardcoded matrix (9 locations) for when Excel file is not available
+TRAVEL_TIME_MATRIX_FALLBACK = {
     'At-Base': {'7H': 5, '5L': 4, 'A&D': 1, '3FXRAY': 3, '化驗室': 3, '6H': 5, '太平間': 8, '支援部': 5},
     '7H': {'At-Base': 5, '3FXRAY': 2.5, '太平間': 17.4, '5L': 2, 'A&D': 4, '化驗室': 4, '6H': 3, '支援部': 6},
     '5L': {'At-Base': 4, '太平間': 19.8, '7H': 2, '3FXRAY': 3, 'A&D': 3, '化驗室': 3, '6H': 2, '支援部': 5},
@@ -16,6 +49,10 @@ TRAVEL_TIME_MATRIX = {
     '太平間': {'At-Base': 8, '7H': 17.4, '5L': 19.8, 'A&D': 10, '3FXRAY': 12, '化驗室': 11, '6H': 23.9, '支援部': 10},
     '支援部': {'At-Base': 5, '7H': 6, '5L': 5, 'A&D': 4, '3FXRAY': 3, '化驗室': 11.1, '6H': 6, '太平間': 10}
 }
+
+# Load the full 89-location matrix from travel_times.xlsx
+xlsx_path = os.path.join(os.path.dirname(__file__), 'travel_time', 'travel_times.xlsx')
+TRAVEL_TIME_MATRIX = load_travel_matrix(xlsx_path)
 
 # --- Step 2: The "Prediction Model" (Task Time) ---
 SERVICE_TASK_TIME = {
@@ -38,23 +75,38 @@ class Porter:
         self.status = 'available'
         self.current_task = None
         self.task_completion_time = None
+        self.available_at = None
+        self.completion_timer = None
         print(f"Porter {self.id} created at {self.current_location}")
 
-    def assign_task(self, task, estimated_total_duration):
+    def assign_task(self, task, estimated_total_duration, on_complete_callback=None):
         self.status = 'busy'
         self.current_task = task
         self.task_completion_time = estimated_total_duration
+        self.available_at = datetime.now() + timedelta(minutes=estimated_total_duration)
         self.current_location = task['to']
         print(f"  [ASSIGNED] Porter {self.id} assigned task. Est. duration: {estimated_total_duration:.1f} mins.")
         print(f"             Task: {task['service']} from {task['from']} to {task['to']}.")
         print(f"             Porter will be at {self.current_location} and 'available' after this task.")
 
+        # Start auto-completion timer if callback provided
+        if on_complete_callback:
+            delay_seconds = estimated_total_duration * 60
+            self.completion_timer = threading.Timer(delay_seconds, on_complete_callback, args=[self.id])
+            self.completion_timer.daemon = False  # FIXED: Make it non-daemon so Flask waits for it
+            self.completion_timer.start()
+            print(f"             Auto-completion timer started for {estimated_total_duration:.1f} mins.")
+
     def complete_task(self):
         if self.status == 'busy':
-            print(f"  [COMPLETED] Porter {self.id} finished task at {self.current_location}. Now available.")
+            print(f"  [COMPLETED] ✓ Porter {self.id} finished task at {self.current_location}. Now available.")
             self.status = 'available'
             self.current_task = None
             self.task_completion_time = None
+            self.available_at = None
+            if self.completion_timer:
+                self.completion_timer.cancel()
+                self.completion_timer = None
         else:
             print(f"  [INFO] Porter {self.id} is already available.")
 
@@ -79,9 +131,10 @@ class ChatGPTLLM:
 
     def _build_system_prompt(self):
         """Creates the detailed instruction prompt for the AI."""
-        valid_locations = list(TRAVEL_TIME_MATRIX.keys())
+        valid_locations = sorted(list(TRAVEL_TIME_MATRIX.keys()))  # 89 locations from the matrix
         valid_services = list(SERVICE_TASK_TIME.keys())
 
+        locations_str = ", ".join(valid_locations)
         prompt = f"""
         You are a hospital dispatch system. Your job is to parse a user request
         into a structured JSON object. Respond ONLY with the JSON object.
@@ -96,7 +149,7 @@ class ChatGPTLLM:
         }}
 
         RULES:
-        1.  "from" and "to" MUST be one of the following valid locations: {valid_locations}
+        1.  "from" and "to" MUST be one of the following valid locations (89 total): {locations_str}
         2.  "service" MUST be one of the following valid services: {valid_services}
         3.  "priority" should be 'Normal', 'Urgent', or 'Super-Urgent'.
         4.  "equipment" should be a list of items needed (e.g., "Wheelchair", "O2", "Stretcher"). If none are mentioned, return an empty list [].
@@ -129,34 +182,118 @@ class ChatGPTLLM:
 class PorterDispatchSystem:
     """
     The main class that orchestrates the entire system.
+    Integrates LLM (for parsing) with optimization solver (for assignment).
+
+    Args:
+        num_porters: Fleet size (3-10). Porters are assigned round-robin starting locations.
+        use_llm: If False, skip LLM initialization (for simulation mode).
     """
-    def __init__(self):
+
+    # Starting locations cycled across porters (real matrix locations)
+    # Falls back to hardcoded locations if matrix doesn't contain them
+    FALLBACK_LOCATIONS = ['At-Base', '7H', 'A&D', '5L', '6H', '3FXRAY', '化驗室', '支援部', '太平間']
+
+    def __init__(self, num_porters=3, use_llm=True):
         self.travel_matrix = TRAVEL_TIME_MATRIX
         self.task_time_map = SERVICE_TASK_TIME
-        self.porters = [
-            Porter('P-001', 'At-Base'),
-            Porter('P-002', '7H'),
-            Porter('P-003', 'A&D')
-        ]
-        self.llm_engine = ChatGPTLLM()
+        self.porters = self._create_fleet(num_porters)
+        self.llm_engine = ChatGPTLLM() if use_llm else None
+        self.solver = PorterDispatchSolver(self.travel_matrix, self.task_time_map)
         self.task_queue = []
 
-    # --- MODIFIED: predict_travel_time ---
+    def _create_fleet(self, num_porters):
+        """Create a fleet of porters with round-robin starting locations from the travel matrix."""
+        # Use locations from the actual travel matrix
+        matrix_locations = list(self.travel_matrix.keys())
+        # Prefer known ward locations that are in the matrix
+        preferred = [l for l in self.FALLBACK_LOCATIONS if l in matrix_locations]
+        if not preferred:
+            preferred = matrix_locations[:num_porters]
+
+        porters = []
+        for i in range(num_porters):
+            pid = f'P-{i+1:03d}'
+            loc = preferred[i % len(preferred)]
+            porters.append(Porter(pid, loc))
+        return porters
+
+    def _on_task_complete(self, porter_id):
+        """Callback triggered when a task auto-completes after its timer expires."""
+        print(f"\n[AUTO-COMPLETE] ✓ Timer expired for Porter {porter_id} - AUTO-COMPLETION FIRING!")
+        self.simulate_task_completion(porter_id)
+
+    def _validate_task(self, task):
+        """Validate that LLM output has valid locations and services."""
+        valid_locations = set(self.travel_matrix.keys())
+        valid_services = set(self.task_time_map.keys())
+
+        from_loc = task.get('from')
+        to_loc = task.get('to')
+        service = task.get('service')
+
+        if from_loc not in valid_locations:
+            print(f"  [Validation] Invalid origin location: {from_loc}. Not in known locations.")
+            return False
+        if to_loc not in valid_locations:
+            print(f"  [Validation] Invalid destination location: {to_loc}. Not in known locations.")
+            return False
+        if service not in valid_services:
+            print(f"  [Validation] Invalid service type: {service}. Not in known services.")
+            return False
+
+        return True
+
     def predict_travel_time(self, origin, destination):
-        """Prediction Model (Travel)."""
-        # 1. Added check for same location
+        """
+        Prediction Model (Travel) with intelligent fallback.
+
+        Strategy:
+        1. Direct lookup in travel matrix
+        2. If missing, check if both locations are on same floor (floor-based fallback)
+        3. If still missing, use p90 global fallback (27.5 min)
+        """
+        # Same location
         if origin == destination:
             return 0.0
-            
+
         try:
-            # 2. Added float() cast for safety
             return float(self.travel_matrix[origin][destination])
-        except KeyError:
-            if origin not in self.travel_matrix or destination not in self.travel_matrix.get(origin, {}):
-                print(f"  [Warning] No direct path found from {origin} to {destination}. Using default 5 min.")
-            # 3. Ensured return is always a float
-            return 5.0
-    # --- End of Modification ---
+        except (KeyError, TypeError):
+            pass
+
+        # Task 3: Floor-based fallback
+        # Extract floor from location name (e.g., "7H" → floor 7, "5L" → floor 5)
+        origin_floor = self._extract_floor(origin)
+        dest_floor = self._extract_floor(destination)
+
+        if origin_floor and dest_floor:
+            if origin_floor == dest_floor:
+                # Same floor: shorter travel time (estimate: 5 min within-floor)
+                print(f"  [Fallback] {origin} → {destination}: same floor {origin_floor}. Using 5 min estimate.")
+                return 5.0
+            else:
+                # Different floors: moderate travel time (estimate: 8 min inter-floor)
+                print(f"  [Fallback] {origin} → {destination}: floors {origin_floor}→{dest_floor}. Using 8 min estimate.")
+                return 8.0
+
+        # Global p90 fallback (from notebook Task 2)
+        print(f"  [Warning] No path from {origin} to {destination}. Using p90 fallback (27.5 min).")
+        return 27.5
+
+    @staticmethod
+    def _extract_floor(location_name):
+        """
+        Extract floor number from location name.
+
+        Examples: "7H" → 7, "5L" → 5, "A&D" → None, "At-Base" → None
+        """
+        if not location_name:
+            return None
+        # Check first character for digit
+        first_char = location_name[0]
+        if first_char.isdigit():
+            return int(first_char)
+        return None
 
     def predict_task_time(self, service_name):
         """Prediction Model (Task)."""
@@ -187,58 +324,178 @@ class PorterDispatchSystem:
         return best_porter, min_time_to_origin
 
     def dispatch_new_task(self, user_request):
-        """Main orchestration function."""
+        """
+        Main orchestration function.
+        Uses optimization solver (OR-Tools or greedy) to assign tasks.
+        """
+        if not self.llm_engine:
+            print("[System] LLM not available. Use dispatch_structured_task() instead.")
+            return None
+
         structured_task = self.llm_engine.get_structured_task(user_request)
         if not structured_task:
             print("[System] LLM failed to parse request. Aborting.")
             return None
 
+        return self.dispatch_structured_task(structured_task)
+
+    def dispatch_structured_task(self, structured_task):
+        """
+        Dispatch an already-parsed task. Uses rolling-horizon re-optimization:
+        all queued tasks + the new task are passed to the solver together.
+
+        Returns: (porter, task, duration) for the first assignment, or None if queued.
+        """
         if "from" not in structured_task or "to" not in structured_task:
-            print(f"[System] LLM parsing error. Invalid task: {structured_task}")
+            print(f"[System] Invalid task (missing from/to): {structured_task}")
             return None
 
-        best_porter, time_to_origin = self.find_best_porter(structured_task)
-        if not best_porter:
+        # Validate that locations and service are known
+        if not self._validate_task(structured_task):
+            print("[System] Task validation failed. Aborting dispatch.")
+            return None
+
+        # Get available porters
+        available_porters = [p for p in self.porters if p.status == 'available']
+        if not available_porters:
             print("[System] Task queued. No porters available.")
             self.task_queue.append(structured_task)
             return None
 
-        travel_time_leg_2 = self.predict_travel_time(structured_task['from'], structured_task['to'])
-        task_time_at_dest = self.predict_task_time(structured_task['service'])
-        
-        # All three of these are now guaranteed to be floats
-        total_estimated_duration = time_to_origin + travel_time_leg_2 + task_time_at_dest
+        # Rolling-horizon: optimize ALL pending tasks together (queued + new)
+        all_pending = self.task_queue + [structured_task]
+        assignments = self.solver.assign_tasks(available_porters, all_pending)
 
-        best_porter.assign_task(structured_task, total_estimated_duration)
-        return best_porter, structured_task, total_estimated_duration
-
-    def simulate_task_completion(self, porter_id):
-        """Helper function to simulate a porter finishing a task."""
-        porter = next((p for p in self.porters if p.id == porter_id), None)
-        if porter:
-            porter.complete_task()
-            if self.task_queue:
-                print(f"[System] Porter {porter.id} is now available. Checking task queue...")
-                queued_task = self.task_queue.pop(0)
-                print(f"--- Re-dispatching queued task: {queued_task['service']} from {queued_task['from']} ---")
-                self.assign_specific_task(queued_task)
-        else:
-            print(f"[System] Porter {porter_id} not found.")
-            
-    def assign_specific_task(self, structured_task):
-        """A variation of dispatch_new_task for already-parsed queued tasks."""
-        best_porter, time_to_origin = self.find_best_porter(structured_task)
-        if not best_porter:
-            print("[System] Task re-queued. No porters available.")
-            self.task_queue.insert(0, structured_task)
+        if not assignments:
+            print("[System] Task queued. Solver could not find assignment.")
+            self.task_queue.append(structured_task)
             return None
 
-        travel_time_leg_2 = self.predict_travel_time(structured_task['from'], structured_task['to'])
-        task_time_at_dest = self.predict_task_time(structured_task['service'])
-        total_estimated_duration = time_to_origin + travel_time_leg_2 + task_time_at_dest
+        # Clear queue — assigned tasks are removed, unassigned stay queued
+        assigned_tasks = set(id(t) for _, t in assignments)
+        self.task_queue = [t for t in self.task_queue if id(t) not in assigned_tasks]
 
-        best_porter.assign_task(structured_task, total_estimated_duration)
-        return best_porter, structured_task, total_estimated_duration
+        # Assign all tasks from solver output
+        first_result = None
+        for porter_id, task in assignments:
+            porter = next(p for p in self.porters if p.id == porter_id)
+            if porter.status == 'busy':
+                # Porter already assigned in this batch — queue remaining tasks
+                self.task_queue.append(task)
+                continue
+
+            time_to_origin = self.predict_travel_time(porter.current_location, task['from'])
+            travel_time_leg_2 = self.predict_travel_time(task['from'], task['to'])
+            task_time_at_dest = self.predict_task_time(task['service'])
+            total_estimated_duration = time_to_origin + travel_time_leg_2 + task_time_at_dest
+
+            porter.assign_task(task, total_estimated_duration, on_complete_callback=self._on_task_complete)
+
+            if first_result is None:
+                first_result = (porter, task, total_estimated_duration)
+
+        return first_result
+
+    def explain_dispatch(self, porter, task, duration, available_porters=None):
+        """
+        Use the LLM to generate a human-readable explanation of why a porter was chosen.
+        Returns explanation string, or a fallback if LLM is unavailable.
+        """
+        # Build context about the assignment
+        porter_loc = porter.current_location
+        time_to_origin = self.predict_travel_time(porter_loc, task['from'])
+        travel_to_dest = self.predict_travel_time(task['from'], task['to'])
+        service_time = self.predict_task_time(task['service'])
+
+        # Build alternatives summary
+        alternatives = ""
+        if available_porters:
+            alt_lines = []
+            for p in available_porters:
+                if p.id == porter.id:
+                    continue
+                alt_travel = self.predict_travel_time(p.current_location, task['from'])
+                alt_lines.append(f"  - {p.id} at {p.current_location}: {alt_travel:.1f} min to origin")
+            if alt_lines:
+                alternatives = "Other porters considered:\n" + "\n".join(alt_lines)
+
+        # Structured fallback (always available, even without LLM)
+        fallback = (
+            f"Porter {porter.id} was at {porter_loc}, only {time_to_origin:.1f} min from the pickup at {task['from']}. "
+            f"Route: {porter_loc} → {task['from']} ({time_to_origin:.1f} min) → {task['to']} ({travel_to_dest:.1f} min) + "
+            f"{service_time:.1f} min service = {duration:.1f} min total."
+        )
+
+        if not self.llm_engine:
+            return fallback
+
+        # Ask LLM for a natural-language explanation
+        prompt = f"""You are a hospital dispatch system. Explain in 2-3 sentences why this porter was chosen for this task.
+
+Assignment:
+- Porter {porter.id} at {porter_loc} assigned to: {task['service']} from {task['from']} to {task['to']}
+- Travel to pickup: {time_to_origin:.1f} min
+- Travel pickup→destination: {travel_to_dest:.1f} min
+- Service time: {service_time:.1f} min
+- Total estimated: {duration:.1f} min
+- Priority: {task.get('priority', 'Normal')}
+{alternatives}
+
+Keep it concise and clinical. Mention specific times and distances."""
+
+        try:
+            response = self.llm_engine.client.chat.completions.create(
+                model="deepseek-chat",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=150
+            )
+            return response.choices[0].message.content.strip()
+        except Exception as e:
+            print(f"[Explain] LLM error: {e}. Using fallback.")
+            return fallback
+
+    def simulate_task_completion(self, porter_id):
+        """Callback when a porter finishes a task. Triggers rolling-horizon re-optimization."""
+        porter = next((p for p in self.porters if p.id == porter_id), None)
+        if not porter:
+            print(f"[System] Porter {porter_id} not found.")
+            return
+
+        porter.complete_task()
+
+        if not self.task_queue:
+            print(f"[System] Task queue is empty.")
+            return
+
+        print(f"[System] Porter {porter.id} now available. Re-optimizing {len(self.task_queue)} queued task(s)...")
+        self._drain_queue()
+
+    def _drain_queue(self):
+        """Re-optimize all queued tasks against all available porters."""
+        available_porters = [p for p in self.porters if p.status == 'available']
+        if not available_porters or not self.task_queue:
+            return
+
+        assignments = self.solver.assign_tasks(available_porters, self.task_queue)
+        if not assignments:
+            return
+
+        assigned_tasks = set(id(t) for _, t in assignments)
+        self.task_queue = [t for t in self.task_queue if id(t) not in assigned_tasks]
+
+        for porter_id, task in assignments:
+            porter = next(p for p in self.porters if p.id == porter_id)
+            if porter.status == 'busy':
+                self.task_queue.append(task)
+                continue
+
+            time_to_origin = self.predict_travel_time(porter.current_location, task['from'])
+            travel_time_leg_2 = self.predict_travel_time(task['from'], task['to'])
+            task_time_at_dest = self.predict_task_time(task['service'])
+            total_estimated_duration = time_to_origin + travel_time_leg_2 + task_time_at_dest
+
+            porter.assign_task(task, total_estimated_duration, on_complete_callback=self._on_task_complete)
+            print(f"[QUEUE-DRAIN] Assigned queued task: {task['service']} {task['from']}→{task['to']} to {porter_id}")
 
 # --- MODIFIED: `if __name__ == "__main__":` ---
 # This block now correctly handles different types of errors

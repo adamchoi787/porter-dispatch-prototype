@@ -44,10 +44,41 @@
             
             <div id="response-area" class="mt-6 p-4 bg-gray-50 rounded-lg border hidden">
                 <h3 class="text-lg font-medium text-gray-900 mb-2" id="response-title">Dispatch Result</h3>
+                <div id="explanation-area" class="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-900 hidden">
+                    <span class="font-semibold">Why this porter?</span>
+                    <p id="explanation-text" class="mt-1"></p>
+                </div>
                 <pre id="response-json" class="text-sm bg-gray-900 text-white p-4 rounded-md overflow-x-auto"></pre>
             </div>
         </div>
         
+    </div>
+
+    <!-- Advisor Panel -->
+    <div class="max-w-4xl mx-auto mt-8 bg-white p-6 rounded-lg shadow-md">
+        <h2 class="text-2xl font-bold mb-4 border-b pb-2">Policy Advisor</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <button id="get-suggestions-btn" class="w-full bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700 mb-3">
+                    Get Policy Suggestions
+                </button>
+                <div id="suggestions-area" class="p-3 bg-purple-50 border border-purple-200 rounded-md text-sm hidden">
+                    <div id="suggestions-content"></div>
+                </div>
+            </div>
+            <div>
+                <div class="flex gap-2 mb-3">
+                    <input type="text" id="advisor-question" placeholder="Ask about operations..."
+                           class="flex-1 p-2 border border-gray-300 rounded-md text-sm">
+                    <button id="ask-advisor-btn" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 text-sm">
+                        Ask
+                    </button>
+                </div>
+                <div id="advisor-answer-area" class="p-3 bg-indigo-50 border border-indigo-200 rounded-md text-sm hidden">
+                    <p id="advisor-answer"></p>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -77,12 +108,10 @@
                         const isAvailable = porter.status === 'available';
                         const statusColor = isAvailable ? 'text-green-600' : 'text-red-600';
                         const bgColor = isAvailable ? 'bg-green-50' : 'bg-red-50';
-                        
+
                         const porterEl = document.createElement('div');
-                        // *** FIX was here: removed \ from `${bgColor}` ***
-                        porterEl.className = `p-3 rounded-lg border ${bgColor}`; 
-                        
-                        // *** FIX was here: removed \ from all `${...}` variables ***
+                        porterEl.className = `p-3 rounded-lg border ${bgColor}`;
+
                         porterEl.innerHTML = `
                             <div class="flex justify-between items-center">
                                 <span class="font-bold text-lg">${porter.id}</span>
@@ -90,6 +119,7 @@
                             </div>
                             <div class="text-sm text-gray-600">Location: ${porter.location}</div>
                             <div class="text-sm text-gray-600">Task: ${porter.task}</div>
+                            ${!isAvailable ? `<button class="complete-task-btn mt-2 w-full bg-yellow-500 text-white py-1 px-2 rounded text-sm hover:bg-yellow-600" data-porter-id="${porter.id}">Complete Task</button>` : ''}
                         `;
                         statusList.appendChild(porterEl);
                     });
@@ -107,6 +137,22 @@
                     console.error('Error fetching status:', error);
                     statusList.innerHTML = '<p class="text-red-500">Error loading status.</p>';
                 }
+
+                // Attach event listeners to "Complete Task" buttons
+                document.querySelectorAll('.complete-task-btn').forEach(btn => {
+                    btn.addEventListener('click', async (e) => {
+                        const porterId = e.target.getAttribute('data-porter-id');
+                        try {
+                            const response = await fetch(`/complete/${porterId}`, { method: 'POST' });
+                            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                            console.log(`[UI] Task completed for ${porterId}`);
+                            fetchStatus(); // Refresh status immediately
+                        } catch (error) {
+                            console.error('Error completing task:', error);
+                            alert(`Failed to complete task for ${porterId}`);
+                        }
+                    });
+                });
             };
             
             // --- Dispatch Logic ---
@@ -131,11 +177,20 @@
                     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                     const data = await response.json();
                     
-                    // *** FIX was here: removed \ from `${data.status}` ***
                     responseTitle.textContent = `Result: ${data.status}`;
                     responseJson.textContent = JSON.stringify(data, null, 2);
                     responseArea.classList.remove('hidden');
-                    
+
+                    // Show LLM explanation if available
+                    const explArea = document.getElementById('explanation-area');
+                    const explText = document.getElementById('explanation-text');
+                    if (data.explanation) {
+                        explText.textContent = data.explanation;
+                        explArea.classList.remove('hidden');
+                    } else {
+                        explArea.classList.add('hidden');
+                    }
+
                     if(data.status === "Task Assigned") {
                         responseArea.classList.remove('border-red-300', 'bg-red-50');
                         responseArea.classList.add('border-green-300', 'bg-green-50');
@@ -169,6 +224,69 @@
                 });
             });
             
+            // --- Advisor Logic ---
+            const suggestionsBtn = document.getElementById('get-suggestions-btn');
+            const suggestionsArea = document.getElementById('suggestions-area');
+            const suggestionsContent = document.getElementById('suggestions-content');
+            const askAdvisorBtn = document.getElementById('ask-advisor-btn');
+            const advisorQuestion = document.getElementById('advisor-question');
+            const advisorAnswerArea = document.getElementById('advisor-answer-area');
+            const advisorAnswer = document.getElementById('advisor-answer');
+
+            suggestionsBtn.addEventListener('click', async () => {
+                suggestionsBtn.textContent = 'Loading...';
+                suggestionsBtn.disabled = true;
+                try {
+                    const resp = await fetch('/advisor/suggestions');
+                    const data = await resp.json();
+                    let html = '<p class="font-semibold mb-2">Performance Summary</p>';
+                    if (data.performance) {
+                        const p = data.performance;
+                        html += `<p>Tasks: ${p.total_tasks} | Mean: ${p.mean_duration} min | KPI violations: ${p.kpi_violation_rate}%</p>`;
+                    }
+                    if (data.suggestions && data.suggestions.length > 0) {
+                        html += '<p class="font-semibold mt-3 mb-1">Suggestions</p><ul class="list-disc pl-5 space-y-1">';
+                        data.suggestions.forEach(s => { html += `<li>${s}</li>`; });
+                        html += '</ul>';
+                    }
+                    suggestionsContent.innerHTML = html;
+                    suggestionsArea.classList.remove('hidden');
+                } catch (err) {
+                    suggestionsContent.innerHTML = `<p class="text-red-500">Error: ${err}</p>`;
+                    suggestionsArea.classList.remove('hidden');
+                } finally {
+                    suggestionsBtn.textContent = 'Get Policy Suggestions';
+                    suggestionsBtn.disabled = false;
+                }
+            });
+
+            askAdvisorBtn.addEventListener('click', async () => {
+                const q = advisorQuestion.value.trim();
+                if (!q) return;
+                askAdvisorBtn.textContent = '...';
+                askAdvisorBtn.disabled = true;
+                try {
+                    const resp = await fetch('/advisor/ask', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ question: q })
+                    });
+                    const data = await resp.json();
+                    advisorAnswer.textContent = data.answer || JSON.stringify(data);
+                    advisorAnswerArea.classList.remove('hidden');
+                } catch (err) {
+                    advisorAnswer.textContent = `Error: ${err}`;
+                    advisorAnswerArea.classList.remove('hidden');
+                } finally {
+                    askAdvisorBtn.textContent = 'Ask';
+                    askAdvisorBtn.disabled = false;
+                }
+            });
+
+            advisorQuestion.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') askAdvisorBtn.click();
+            });
+
             // Initial load
             fetchStatus();
         });
