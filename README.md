@@ -68,7 +68,6 @@ pip install flask openai python-dotenv pandas openpyxl ortools
 echo "OPENAI_API_KEY=your-deepseek-key-here" > .env
 ```
 
-> **Note:** `requirements.txt` lists `openaix` — this is a typo; install `openai`.
 
 ---
 
@@ -152,6 +151,59 @@ Policy Advisor (RAG over DATA2024.xlsx)
 **LLM backend:** DeepSeek API (`https://api.deepseek.com`, model `deepseek-chat`) via OpenAI-compatible client. API key set via `OPENAI_API_KEY` environment variable or `.env` file.
 
 **All state is in-memory** — resets on restart. No database.
+
+---
+
+## Code Reference
+
+### [`solver.py`](solver.py)
+The OR-Tools VRPTW model. Completely standalone — no Flask, no LLM.
+- **Lines 1–21** — OR-Tools import with greedy fallback flag
+- **Lines 23–80** — `PorterDispatchSolver` init: KPI limit, soft penalty, drop penalty, time limit
+- **Lines 82–130** — `_solve_greedy()`: nearest-porter fallback algorithm
+- **Lines 132–280** — `_solve_ortools()`: full VRPTW model — node layout, time dimension, pickup-delivery pairs, capacity constraint, penalties, solver call
+- **Lines 282–300** — `assign_tasks()`: public entry point, selects strategy
+
+### [`porter_prototype.py`](porter_prototype.py)
+Core dispatch system. Owns porter state and orchestrates the LLM + solver pipeline.
+- **`ChatGPTLLM`** — wraps DeepSeek API; parses natural language → structured task JSON
+- **`PorterDispatchSystem.__init__()`** — creates porter fleet, loads travel matrix, initializes solver
+- **`_create_fleet()`** — builds N porters at round-robin locations from the travel matrix
+- **`dispatch_task()`** — receives raw text → calls LLM → calls solver → updates porter state
+- **`dispatch_structured_task()`** — receives pre-parsed JSON → calls solver directly (used by simulation)
+- **`explain_dispatch()`** — calls LLM to generate "why this porter" rationale
+- **`_drain_queue()`** — re-runs solver when a porter becomes free (rolling-horizon)
+- **`TRAVEL_TIME_MATRIX`** — travel times between all hospital departments (from `travel_times.xlsx`)
+- **`SERVICE_TASK_TIMES`** — estimated durations per service type
+
+### [`advisor.py`](advisor.py)
+Historical data analysis and LLM-powered policy advice.
+- **`HistoricalTaskStore._load()`** — reads `DATA2024.xlsx`, parses timestamps, computes actual durations
+- **`HistoricalTaskStore.find_similar()`** — scores historical tasks by service/location/time-of-day match
+- **`HistoricalTaskStore.get_performance_summary()`** — computes KPI violation rate (76.1%), mean duration, per-service breakdowns
+- **`PolicyAdvisor.assess_kpi_risk()`** — heuristic risk score (Low/Medium/High) + LLM reasoning for a specific incoming task
+- **`PolicyAdvisor.get_suggestions()`** — full dataset analysis + LLM-generated policy suggestions
+- **`PolicyAdvisor.ask()`** — free-text Q&A with performance data as LLM context
+
+### [`simulation.py`](simulation.py)
+Offline discrete-event simulation for benchmarking. No web server involved.
+- **`load_historical_tasks()`** — reads `DATA2024.xlsx`, returns sorted task list for replay
+- **`generate_synthetic_tasks()`** — Poisson inter-arrivals, weighted service type distribution
+- **`run_simulation()`** — event queue loop: task arrivals → solver assignment → porter-free events
+- **`compute_metrics()`** — mean/P95/max duration, KPI violation rate, mean wait time
+- **`main()`** — CLI argument parsing, runs both strategies, prints comparison table, saves CSV
+
+### [`app.py`](app.py)
+Flask web server. Glues all components together and exposes REST endpoints.
+- Initializes `PorterDispatchSystem` and `PolicyAdvisor` on startup
+- Routes: `/dispatch`, `/status`, `/complete/<porter_id>`, `/advisor/risk`, `/advisor/suggestions`, `/advisor/ask`
+
+### [`static/index.html`](static/index.html)
+Entire frontend in one file — vanilla JS, Tailwind CSS.
+- Left panel: porter status cards, polls `GET /status` every 3 seconds
+- Right panel: task input box + quick-action buttons → `POST /dispatch`
+- Explanation panel: "Why this porter?" LLM rationale
+- Policy Advisor section: suggestions button + free-text ask box
 
 ---
 
