@@ -14,7 +14,8 @@ app = Flask(__name__, static_folder='static')
 
 # --- Initialize the Dispatch System ---
 try:
-    system = PorterDispatchSystem()
+    num_porters = int(os.getenv('NUM_PORTERS', 10))
+    system = PorterDispatchSystem(num_porters=num_porters)
     print("--- Porter Dispatch System Initialized for API (using OpenAI) ---")
 
     # Set all porters to 'available' for a fresh API start
@@ -67,32 +68,31 @@ def handle_dispatch():
 
         print(f"[API] Received request (sending to OpenAI): {user_request}")
 
-        # Use our system's main function
-        result = system.dispatch_new_task(user_request)
+        results = system.dispatch_new_task(user_request)
 
-        if result:
-            porter, task, duration = result
+        assignments = []
+        queued_count = 0
+        for result in results:
+            if result:
+                porter, task, duration = result
+                available = [p for p in system.porters if p.status == 'available' or p.id == porter.id]
+                explanation = system.explain_dispatch(porter, task, duration, available)
+                assignments.append({
+                    "status": "Task Assigned",
+                    "porter_id": porter.id,
+                    "porter_location": porter.current_location,
+                    "task": task,
+                    "estimated_duration_mins": round(duration, 1),
+                    "explanation": explanation
+                })
+            else:
+                queued_count += 1
 
-            # Generate LLM explanation of the assignment
-            available = [p for p in system.porters if p.status == 'available' or p.id == porter.id]
-            explanation = system.explain_dispatch(porter, task, duration, available)
-
-            response = {
-                "status": "Task Assigned",
-                "porter_id": porter.id,
-                "porter_location": porter.current_location,
-                "task": task,
-                "estimated_duration_mins": round(duration, 1),
-                "explanation": explanation
-            }
-        else:
-            # This means the task was queued
-            response = {
-                "status": "Task Queued",
-                "message": "All porters are currently busy. Task added to queue.",
-                "queue_length": len(system.task_queue)
-            }
-
+        response = {
+            "assignments": assignments,
+            "queued": queued_count,
+            "queue_length": len(system.task_queue)
+        }
         return jsonify(response)
     except Exception as e:
         print(f"[API] Error processing dispatch: {e}")
@@ -119,7 +119,8 @@ def get_status():
 
     response = {
         "porters": porter_statuses,
-        "queue_length": len(system.task_queue)
+        "queue_length": len(system.task_queue),
+        "total_porters": len(system.porters)
     }
     return jsonify(response)
 

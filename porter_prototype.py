@@ -141,26 +141,33 @@ class ChatGPTLLM:
 
         The JSON object must have this exact format:
         {{
-          "from": "ORIGIN_LOCATION",
-          "to": "DESTINATION_LOCATION",
-          "service": "SERVICE_TYPE",
-          "priority": "PRIORITY_LEVEL",
-          "equipment": ["EQUIPMENT_1", "EQUIPMENT_2", ...]
+          "tasks": [
+            {{
+              "from": "ORIGIN_LOCATION",
+              "stops": ["STOP_1", "STOP_2"],
+              "to": "DESTINATION_LOCATION",
+              "service": "SERVICE_TYPE",
+              "priority": "PRIORITY_LEVEL",
+              "equipment": ["EQUIPMENT_1", "EQUIPMENT_2", ...]
+            }}
+          ]
         }}
 
         RULES:
-        1.  "from" and "to" MUST be one of the following valid locations (89 total): {locations_str}
+        1.  "from", all "stops" entries, and "to" MUST be one of the following valid locations (89 total): {locations_str}
         2.  "service" MUST be one of the following valid services: {valid_services}
         3.  "priority" should be 'Normal', 'Urgent', or 'Super-Urgent'.
         4.  "equipment" should be a list of items needed (e.g., "Wheelchair", "O2", "Stretcher"). If none are mentioned, return an empty list [].
-        5.  If you cannot determine a value, use "Unknown".
+        5.  "stops" is an ordered list of intermediate locations to visit between "from" and "to". Return [] if none are mentioned.
+        6.  If the request describes multiple tasks, include ALL of them in the "tasks" array.
+        7.  If you cannot determine a value, use "Unknown".
         """
         return prompt
 
-    def get_structured_task(self, user_request):
-        """Parses the natural language request into a structured dict."""
+    def get_structured_tasks(self, user_request):
+        """Parses the natural language request into a list of structured task dicts."""
         print(f"\n[LLM-OpenAI] Parsing request: '{user_request}'")
-        
+
         try:
             response = self.client.chat.completions.create(
                 model="deepseek-chat",
@@ -170,14 +177,18 @@ class ChatGPTLLM:
                 ],
                 response_format={"type": "json_object"}
             )
-            
+
             parsed_json = json.loads(response.choices[0].message.content)
             print(f"[LLM-OpenAI] Parsed data: {json.dumps(parsed_json)}")
-            return parsed_json
-            
+
+            # Expect {"tasks": [...]}; fall back to wrapping a bare single-task object
+            if "tasks" in parsed_json and isinstance(parsed_json["tasks"], list):
+                return parsed_json["tasks"]
+            return [parsed_json]
+
         except Exception as e:
             print(f"[LLM-OpenAI] Error parsing request: {e}")
-            return None
+            return []
 
 class PorterDispatchSystem:
     """
@@ -193,7 +204,7 @@ class PorterDispatchSystem:
     # Falls back to hardcoded locations if matrix doesn't contain them
     FALLBACK_LOCATIONS = ['At-Base', '7H', 'A&D', '5L', '6H', '3FXRAY', '化驗室', '支援部', '太平間']
 
-    def __init__(self, num_porters=3, use_llm=True):
+    def __init__(self, num_porters=10, use_llm=True):
         self.travel_matrix = TRAVEL_TIME_MATRIX
         self.task_time_map = SERVICE_TASK_TIME
         self.porters = self._create_fleet(num_porters)
@@ -240,6 +251,10 @@ class PorterDispatchSystem:
         if service not in valid_services:
             print(f"  [Validation] Invalid service type: {service}. Not in known services.")
             return False
+        for stop in task.get('stops', []):
+            if stop not in valid_locations:
+                print(f"  [Validation] Invalid stop location: {stop}. Not in known locations.")
+                return False
 
         return True
 
@@ -295,6 +310,14 @@ class PorterDispatchSystem:
             return int(first_char)
         return None
 
+    def predict_route_time(self, porter_location, task):
+        """Total travel time for the full route: porter → origin → stops → destination."""
+        waypoints = [porter_location, task['from']] + task.get('stops', []) + [task['to']]
+        return sum(
+            self.predict_travel_time(waypoints[i], waypoints[i + 1])
+            for i in range(len(waypoints) - 1)
+        )
+
     def predict_task_time(self, service_name):
         """Prediction Model (Task)."""
         return self.task_time_map.get(service_name, self.task_time_map['default'])
@@ -325,19 +348,22 @@ class PorterDispatchSystem:
 
     def dispatch_new_task(self, user_request):
         """
-        Main orchestration function.
-        Uses optimization solver (OR-Tools or greedy) to assign tasks.
+        Main orchestration function. Parses one or more tasks from natural language
+        and dispatches each. Returns a list of (porter, task, duration) or None per task.
         """
         if not self.llm_engine:
             print("[System] LLM not available. Use dispatch_structured_task() instead.")
-            return None
+            return []
 
-        structured_task = self.llm_engine.get_structured_task(user_request)
-        if not structured_task:
+        structured_tasks = self.llm_engine.get_structured_tasks(user_request)
+        if not structured_tasks:
             print("[System] LLM failed to parse request. Aborting.")
-            return None
+            return []
 
-        return self.dispatch_structured_task(structured_task)
+        results = []
+        for task in structured_tasks:
+            results.append(self.dispatch_structured_task(task))
+        return results
 
     def dispatch_structured_task(self, structured_task):
         """
@@ -384,10 +410,9 @@ class PorterDispatchSystem:
                 self.task_queue.append(task)
                 continue
 
-            time_to_origin = self.predict_travel_time(porter.current_location, task['from'])
-            travel_time_leg_2 = self.predict_travel_time(task['from'], task['to'])
+            total_travel_time = self.predict_route_time(porter.current_location, task)
             task_time_at_dest = self.predict_task_time(task['service'])
-            total_estimated_duration = time_to_origin + travel_time_leg_2 + task_time_at_dest
+            total_estimated_duration = total_travel_time + task_time_at_dest
 
             porter.assign_task(task, total_estimated_duration, on_complete_callback=self._on_task_complete)
 
@@ -404,8 +429,12 @@ class PorterDispatchSystem:
         # Build context about the assignment
         porter_loc = porter.current_location
         time_to_origin = self.predict_travel_time(porter_loc, task['from'])
-        travel_to_dest = self.predict_travel_time(task['from'], task['to'])
         service_time = self.predict_task_time(task['service'])
+        stops = task.get('stops', [])
+
+        # Build full route string for display
+        route_parts = [porter_loc, task['from']] + stops + [task['to']]
+        route_str = ' → '.join(route_parts)
 
         # Build alternatives summary
         alternatives = ""
@@ -422,8 +451,7 @@ class PorterDispatchSystem:
         # Structured fallback (always available, even without LLM)
         fallback = (
             f"Porter {porter.id} was at {porter_loc}, only {time_to_origin:.1f} min from the pickup at {task['from']}. "
-            f"Route: {porter_loc} → {task['from']} ({time_to_origin:.1f} min) → {task['to']} ({travel_to_dest:.1f} min) + "
-            f"{service_time:.1f} min service = {duration:.1f} min total."
+            f"Route: {route_str} + {service_time:.1f} min service = {duration:.1f} min total."
         )
 
         if not self.llm_engine:
@@ -433,11 +461,10 @@ class PorterDispatchSystem:
         prompt = f"""You are a hospital dispatch system. Explain in 2-3 sentences why this porter was chosen for this task.
 
 Assignment:
-- Porter {porter.id} at {porter_loc} assigned to: {task['service']} from {task['from']} to {task['to']}
+- Porter {porter.id} at {porter_loc} assigned to: {task['service']}
+- Full route: {route_str}
 - Travel to pickup: {time_to_origin:.1f} min
-- Travel pickup→destination: {travel_to_dest:.1f} min
-- Service time: {service_time:.1f} min
-- Total estimated: {duration:.1f} min
+- Total estimated: {duration:.1f} min (including {service_time:.1f} min service)
 - Priority: {task.get('priority', 'Normal')}
 {alternatives}
 
@@ -489,13 +516,13 @@ Keep it concise and clinical. Mention specific times and distances."""
                 self.task_queue.append(task)
                 continue
 
-            time_to_origin = self.predict_travel_time(porter.current_location, task['from'])
-            travel_time_leg_2 = self.predict_travel_time(task['from'], task['to'])
+            total_travel_time = self.predict_route_time(porter.current_location, task)
             task_time_at_dest = self.predict_task_time(task['service'])
-            total_estimated_duration = time_to_origin + travel_time_leg_2 + task_time_at_dest
+            total_estimated_duration = total_travel_time + task_time_at_dest
 
             porter.assign_task(task, total_estimated_duration, on_complete_callback=self._on_task_complete)
-            print(f"[QUEUE-DRAIN] Assigned queued task: {task['service']} {task['from']}→{task['to']} to {porter_id}")
+            stops_str = f" via {task['stops']}" if task.get('stops') else ""
+            print(f"[QUEUE-DRAIN] Assigned queued task: {task['service']} {task['from']}{stops_str}→{task['to']} to {porter_id}")
 
 # --- MODIFIED: `if __name__ == "__main__":` ---
 # This block now correctly handles different types of errors
