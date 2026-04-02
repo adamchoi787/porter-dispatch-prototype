@@ -89,6 +89,7 @@ def handle_dispatch():
                 queued_count += 1
 
         errors = [e['error'] for e in system.last_task_errors]
+        queued_count = max(0, queued_count - len(errors))
 
         response = {
             "assignments": assignments,
