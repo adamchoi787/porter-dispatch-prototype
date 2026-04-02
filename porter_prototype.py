@@ -161,8 +161,10 @@ class ChatGPTLLM:
         2.  "service" MUST be one of the following valid services: {valid_services}
         3.  "priority" should be 'Normal', 'Urgent', or 'Super-Urgent'.
         4.  "equipment" should be a list of items needed (e.g., "Wheelchair", "O2", "Stretcher"). If none are mentioned, return an empty list [].
-        5.  "stops" is an ordered list of intermediate locations to visit between "from" and "to". Return [] if none are mentioned.
-        6.  If the request describes multiple tasks, include ALL of them in the "tasks" array.
+        5.  "stops" is an ordered list of intermediate locations to visit between "from" and "to". Return [] if none.
+            - A chain like "from A to B to C" or "A → B → C" means ONE task: from=A, stops=[B], to=C.
+            - Only split into multiple tasks if the request clearly describes separate, independent journeys (e.g. different items or people going to different places).
+        6.  If the request describes multiple independent tasks, include ALL of them in the "tasks" array.
         7.  If you cannot determine a value, use "Unknown".
         """
         return prompt

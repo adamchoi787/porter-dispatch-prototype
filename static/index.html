@@ -265,6 +265,10 @@
                 undoBtn.textContent = 'Undoing...';
                 try {
                     const resp = await fetch('/undo', { method: 'POST' });
+                    if (!resp.ok) {
+                        const text = await resp.text();
+                        throw new Error(`Server returned ${resp.status}: ${text.slice(0, 200)}`);
+                    }
                     const data = await resp.json();
                     responseTitle.textContent = data.message || 'Undo complete';
                     document.getElementById('assignments-container').innerHTML = '';

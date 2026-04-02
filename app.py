@@ -112,11 +112,11 @@ def get_status():
     def build_route(p):
         if not p.current_task or not p.task_start_location:
             return None
-        waypoints = (
-            [p.task_start_location, p.current_task['from']]
-            + p.current_task.get('stops', [])
-            + [p.current_task['to']]
-        )
+        start = p.task_start_location
+        origin = p.current_task['from']
+        waypoints = [origin] + p.current_task.get('stops', []) + [p.current_task['to']]
+        if start != origin:
+            waypoints = [start] + waypoints
         return ' → '.join(waypoints)
 
     porter_statuses = [
