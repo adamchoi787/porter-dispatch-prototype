@@ -74,6 +74,7 @@ class Porter:
         self.current_location = initial_location
         self.status = 'available'
         self.current_task = None
+        self.task_start_location = None
         self.task_completion_time = None
         self.available_at = None
         self.completion_timer = None
@@ -82,6 +83,7 @@ class Porter:
     def assign_task(self, task, estimated_total_duration, on_complete_callback=None):
         self.status = 'busy'
         self.current_task = task
+        self.task_start_location = self.current_location
         self.task_completion_time = estimated_total_duration
         self.available_at = datetime.now() + timedelta(minutes=estimated_total_duration)
         self.current_location = task['to']
@@ -102,6 +104,7 @@ class Porter:
             print(f"  [COMPLETED] ✓ Porter {self.id} finished task at {self.current_location}. Now available.")
             self.status = 'available'
             self.current_task = None
+            self.task_start_location = None
             self.task_completion_time = None
             self.available_at = None
             if self.completion_timer:
@@ -211,6 +214,8 @@ class PorterDispatchSystem:
         self.llm_engine = ChatGPTLLM() if use_llm else None
         self.solver = PorterDispatchSolver(self.travel_matrix, self.task_time_map)
         self.task_queue = []
+        self.last_dispatch = None   # undo snapshot: {assigned: [...], queued: [...]}
+        self.last_task_errors = []  # validation errors from the most recent dispatch call
 
     def _create_fleet(self, num_porters):
         """Create a fleet of porters with round-robin starting locations from the travel matrix."""
@@ -234,7 +239,10 @@ class PorterDispatchSystem:
         self.simulate_task_completion(porter_id)
 
     def _validate_task(self, task):
-        """Validate that LLM output has valid locations and services."""
+        """
+        Validate that LLM output has valid locations and services.
+        Returns None if valid, or a human-readable error string if invalid.
+        """
         valid_locations = set(self.travel_matrix.keys())
         valid_services = set(self.task_time_map.keys())
 
@@ -242,21 +250,29 @@ class PorterDispatchSystem:
         to_loc = task.get('to')
         service = task.get('service')
 
-        if from_loc not in valid_locations:
-            print(f"  [Validation] Invalid origin location: {from_loc}. Not in known locations.")
-            return False
-        if to_loc not in valid_locations:
-            print(f"  [Validation] Invalid destination location: {to_loc}. Not in known locations.")
-            return False
-        if service not in valid_services:
-            print(f"  [Validation] Invalid service type: {service}. Not in known services.")
-            return False
+        if not from_loc or from_loc not in valid_locations:
+            return (
+                f"Unknown origin location: '{from_loc}'. "
+                "Check the spelling or use a known hospital location."
+            )
+        if not to_loc or to_loc not in valid_locations:
+            return (
+                f"Unknown destination location: '{to_loc}'. "
+                "Check the spelling or use a known hospital location."
+            )
+        if not service or service not in valid_services:
+            valid_list = ', '.join(sorted(valid_services - {'default'}))
+            return (
+                f"Unknown service type: '{service}'. "
+                f"Valid types are: {valid_list}."
+            )
         for stop in task.get('stops', []):
             if stop not in valid_locations:
-                print(f"  [Validation] Invalid stop location: {stop}. Not in known locations.")
-                return False
-
-        return True
+                return (
+                    f"Unknown stop location: '{stop}'. "
+                    "Check the spelling or use a known hospital location."
+                )
+        return None
 
     def predict_travel_time(self, origin, destination):
         """
@@ -350,10 +366,15 @@ class PorterDispatchSystem:
         """
         Main orchestration function. Parses one or more tasks from natural language
         and dispatches each. Returns a list of (porter, task, duration) or None per task.
+        Populates self.last_task_errors with any validation failures.
+        Stores an undo snapshot in self.last_dispatch.
         """
         if not self.llm_engine:
             print("[System] LLM not available. Use dispatch_structured_task() instead.")
             return []
+
+        self.last_task_errors = []
+        tracking = {'assigned': [], 'queued': []}
 
         structured_tasks = self.llm_engine.get_structured_tasks(user_request)
         if not structured_tasks:
@@ -362,23 +383,30 @@ class PorterDispatchSystem:
 
         results = []
         for task in structured_tasks:
-            results.append(self.dispatch_structured_task(task))
+            results.append(self.dispatch_structured_task(task, tracking=tracking))
+
+        self.last_dispatch = tracking
         return results
 
-    def dispatch_structured_task(self, structured_task):
+    def dispatch_structured_task(self, structured_task, tracking=None):
         """
         Dispatch an already-parsed task. Uses rolling-horizon re-optimization:
         all queued tasks + the new task are passed to the solver together.
 
-        Returns: (porter, task, duration) for the first assignment, or None if queued.
+        tracking: optional dict {assigned: [], queued: []} populated for undo support.
+        Returns: (porter, task, duration) for the first assignment, or None if queued/error.
         """
         if "from" not in structured_task or "to" not in structured_task:
-            print(f"[System] Invalid task (missing from/to): {structured_task}")
+            msg = "Task is missing 'from' or 'to' field — the LLM could not identify an origin or destination."
+            print(f"[System] {msg}")
+            self.last_task_errors.append({'task': structured_task, 'error': msg})
             return None
 
         # Validate that locations and service are known
-        if not self._validate_task(structured_task):
-            print("[System] Task validation failed. Aborting dispatch.")
+        error = self._validate_task(structured_task)
+        if error:
+            print(f"[System] Task validation failed: {error}")
+            self.last_task_errors.append({'task': structured_task, 'error': error})
             return None
 
         # Get available porters
@@ -386,6 +414,8 @@ class PorterDispatchSystem:
         if not available_porters:
             print("[System] Task queued. No porters available.")
             self.task_queue.append(structured_task)
+            if tracking is not None:
+                tracking['queued'].append(structured_task)
             return None
 
         # Rolling-horizon: optimize ALL pending tasks together (queued + new)
@@ -395,6 +425,8 @@ class PorterDispatchSystem:
         if not assignments:
             print("[System] Task queued. Solver could not find assignment.")
             self.task_queue.append(structured_task)
+            if tracking is not None:
+                tracking['queued'].append(structured_task)
             return None
 
         # Clear queue — assigned tasks are removed, unassigned stay queued
@@ -410,11 +442,15 @@ class PorterDispatchSystem:
                 self.task_queue.append(task)
                 continue
 
+            prev_location = porter.current_location
             total_travel_time = self.predict_route_time(porter.current_location, task)
             task_time_at_dest = self.predict_task_time(task['service'])
             total_estimated_duration = total_travel_time + task_time_at_dest
 
             porter.assign_task(task, total_estimated_duration, on_complete_callback=self._on_task_complete)
+
+            if tracking is not None:
+                tracking['assigned'].append({'porter': porter, 'prev_location': prev_location})
 
             if first_result is None:
                 first_result = (porter, task, total_estimated_duration)
@@ -523,6 +559,45 @@ Keep it concise and clinical. Mention specific times and distances."""
             porter.assign_task(task, total_estimated_duration, on_complete_callback=self._on_task_complete)
             stops_str = f" via {task['stops']}" if task.get('stops') else ""
             print(f"[QUEUE-DRAIN] Assigned queued task: {task['service']} {task['from']}{stops_str}→{task['to']} to {porter_id}")
+
+    def undo_last_dispatch(self):
+        """
+        Undo the most recent dispatch call: free assigned porters and remove queued tasks.
+        Returns (success: bool, message: str).
+        """
+        if not self.last_dispatch:
+            return False, "Nothing to undo — no dispatch has been made yet."
+
+        n_assigned = len(self.last_dispatch['assigned'])
+        n_queued = len(self.last_dispatch['queued'])
+
+        # Restore each assigned porter to their pre-dispatch state
+        for entry in self.last_dispatch['assigned']:
+            porter = entry['porter']
+            if porter.completion_timer:
+                porter.completion_timer.cancel()
+                porter.completion_timer = None
+            porter.status = 'available'
+            porter.current_location = entry['prev_location']
+            porter.current_task = None
+            porter.task_start_location = None
+            porter.task_completion_time = None
+            porter.available_at = None
+            print(f"[UNDO] Porter {porter.id} restored to {entry['prev_location']}.")
+
+        # Remove any queued tasks from this dispatch from the task queue
+        if n_queued:
+            queued_ids = set(id(t) for t in self.last_dispatch['queued'])
+            self.task_queue = [t for t in self.task_queue if id(t) not in queued_ids]
+            print(f"[UNDO] Removed {n_queued} queued task(s).")
+
+        self.last_dispatch = None
+        parts = []
+        if n_assigned:
+            parts.append(f"{n_assigned} porter assignment(s) reversed")
+        if n_queued:
+            parts.append(f"{n_queued} queued task(s) removed")
+        return True, "Undo successful: " + ", ".join(parts) + "."
 
 # --- MODIFIED: `if __name__ == "__main__":` ---
 # This block now correctly handles different types of errors

@@ -28,9 +28,14 @@
                     <textarea id="task-input" rows="3" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></textarea>
                 </div>
                 
-                <button id="dispatch-btn" class="w-full bg-green-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-green-700">
-                    Dispatch Task
-                </button>
+                <div class="flex gap-2">
+                    <button id="dispatch-btn" class="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-green-700">
+                        Dispatch Task
+                    </button>
+                    <button id="undo-btn" class="bg-yellow-500 text-white py-2 px-4 rounded-lg font-medium hover:bg-yellow-600 hidden">
+                        Undo
+                    </button>
+                </div>
                 
                 <div class="pt-4">
                     <h3 class="text-lg font-medium">Quick Tasks (Examples)</h3>
@@ -82,6 +87,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             const taskInput = document.getElementById('task-input');
             const dispatchBtn = document.getElementById('dispatch-btn');
+            const undoBtn = document.getElementById('undo-btn');
             const responseArea = document.getElementById('response-area');
             const responseTitle = document.getElementById('response-title');
             const responseJson = document.getElementById('response-json');
@@ -121,6 +127,7 @@
                             </div>
                             <div class="text-sm text-gray-600">Location: ${porter.location}</div>
                             <div class="text-sm text-gray-600">Task: ${porter.task}</div>
+                            ${porter.route ? `<div class="text-sm text-indigo-700 font-mono mt-1">${porter.route}</div>` : ''}
                             ${!isAvailable ? `<button class="complete-task-btn mt-2 w-full bg-yellow-500 text-white py-1 px-2 rounded text-sm hover:bg-yellow-600" data-porter-id="${porter.id}">Complete Task</button>` : ''}
                         `;
                         statusList.appendChild(porterEl);
@@ -181,13 +188,28 @@
 
                     const assigned = data.assignments || [];
                     const queued = data.queued || 0;
+                    const errors = data.errors || [];
                     const titleParts = [];
                     if (assigned.length) titleParts.push(`${assigned.length} assigned`);
                     if (queued) titleParts.push(`${queued} queued`);
+                    if (errors.length) titleParts.push(`${errors.length} error(s)`);
                     responseTitle.textContent = `Result: ${titleParts.join(', ') || 'No tasks'}`;
 
                     const container = document.getElementById('assignments-container');
                     container.innerHTML = '';
+
+                    // Error cards — shown when the LLM returned unrecognised locations/services
+                    errors.forEach(errMsg => {
+                        const errCard = document.createElement('div');
+                        errCard.className = 'p-3 rounded-lg border border-orange-400 bg-orange-50';
+                        errCard.innerHTML = `
+                            <div class="font-semibold text-orange-800">Could not dispatch task</div>
+                            <div class="text-sm text-orange-700 mt-1">${errMsg}</div>
+                            <div class="text-xs text-orange-500 mt-1">Try rephrasing with exact location names (e.g. "7H", "A&D", "3FXRAY").</div>
+                        `;
+                        container.appendChild(errCard);
+                    });
+
                     assigned.forEach(a => {
                         const stops = (a.task && a.task.stops && a.task.stops.length)
                             ? `<div class="text-sm text-gray-600">Stops: ${a.task.stops.join(' → ')}</div>` : '';
@@ -212,7 +234,14 @@
                     responseArea.classList.remove('hidden');
                     responseArea.classList.remove('border-red-300', 'bg-red-50', 'border-green-300', 'bg-green-50');
                     responseArea.classList.add(assigned.length ? 'border-green-300' : 'border-red-300');
-                    
+
+                    // Show undo button only when something was actually dispatched
+                    if (assigned.length > 0 || queued > 0) {
+                        undoBtn.classList.remove('hidden');
+                    } else {
+                        undoBtn.classList.add('hidden');
+                    }
+
                     // Refresh status after dispatch
                     fetchStatus();
 
@@ -230,6 +259,25 @@
 
             dispatchBtn.addEventListener('click', handleDispatch);
             refreshBtn.addEventListener('click', fetchStatus);
+
+            undoBtn.addEventListener('click', async () => {
+                undoBtn.disabled = true;
+                undoBtn.textContent = 'Undoing...';
+                try {
+                    const resp = await fetch('/undo', { method: 'POST' });
+                    const data = await resp.json();
+                    responseTitle.textContent = data.message || 'Undo complete';
+                    document.getElementById('assignments-container').innerHTML = '';
+                    responseJson.textContent = JSON.stringify(data, null, 2);
+                } catch (err) {
+                    responseTitle.textContent = `Undo failed: ${err}`;
+                } finally {
+                    undoBtn.classList.add('hidden');
+                    undoBtn.disabled = false;
+                    undoBtn.textContent = 'Undo';
+                    fetchStatus();
+                }
+            });
             
             quickTaskBtns.forEach(btn => {
                 btn.addEventListener('click', (e) => {

@@ -88,10 +88,13 @@ def handle_dispatch():
             else:
                 queued_count += 1
 
+        errors = [e['error'] for e in system.last_task_errors]
+
         response = {
             "assignments": assignments,
             "queued": queued_count,
-            "queue_length": len(system.task_queue)
+            "queue_length": len(system.task_queue),
+            "errors": errors
         }
         return jsonify(response)
     except Exception as e:
@@ -106,12 +109,23 @@ def get_status():
 
     import datetime
     now = datetime.datetime.now()
+    def build_route(p):
+        if not p.current_task or not p.task_start_location:
+            return None
+        waypoints = (
+            [p.task_start_location, p.current_task['from']]
+            + p.current_task.get('stops', [])
+            + [p.current_task['to']]
+        )
+        return ' → '.join(waypoints)
+
     porter_statuses = [
         {
             "id": p.id,
             "status": p.status,
             "location": p.current_location,
             "task": p.current_task['service'] if p.current_task else 'None',
+            "route": build_route(p),
             "available_at": p.available_at.isoformat() if p.available_at else None,
             "seconds_until_available": max(0, int((p.available_at - now).total_seconds())) if p.available_at else None
         } for p in system.porters
@@ -123,6 +137,15 @@ def get_status():
         "total_porters": len(system.porters)
     }
     return jsonify(response)
+
+@app.route('/undo', methods=['POST'])
+def undo_dispatch():
+    """Undo the most recent dispatch: free assigned porters and remove queued tasks."""
+    if not system:
+        return jsonify({"error": "System not initialized"}), 500
+    success, message = system.undo_last_dispatch()
+    return jsonify({"success": success, "message": message})
+
 
 @app.route('/complete/<porter_id>', methods=['POST'])
 def complete_task(porter_id):
