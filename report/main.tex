@@ -11,6 +11,7 @@
 \usepackage[utf8]{inputenc}
 \usepackage{lmodern}
 \usepackage{graphicx}
+\usepackage{url}
 \usepackage{booktabs}
 \usepackage{array}
 \usepackage{longtable}
@@ -19,6 +20,7 @@
 \usepackage{hyperref}
 \usepackage{xcolor}
 \usepackage{float}
+\usepackage[all]{hypcap}
 \usepackage{setspace}
 \usepackage{fancyhdr}
 \usepackage{microtype}
@@ -28,6 +30,7 @@
 \usetikzlibrary{shapes.geometric, arrows.meta, positioning, backgrounds}
 
 %% --- Page style ---
+\setlength{\headheight}{14pt}
 \pagestyle{fancy}
 \fancyhf{}
 \rhead{\small Project 16 --- AI-Driven Porter Dispatch System}
@@ -192,7 +195,7 @@ A key practical challenge is ensuring LLMs produce \textit{reliably structured} 
 
 Retrieval-Augmented Generation (RAG) \cite{lewis2020} extends language models by conditioning their outputs on retrieved passages from an external knowledge base. Rather than relying solely on parametric knowledge encoded during training, a RAG system retrieves the most relevant records from a corpus at inference time and presents them alongside the query. This approach is particularly effective for domain-specific questions where the LLM's training data may not cover the domain sufficiently.
 
-In this project, RAG is applied in the policy advisor component: the historical DATA2024.xlsx dataset serves as the knowledge base. When a dispatcher asks about KPI risk or requests operational suggestions, the system retrieves the $K$ most similar past tasks by service type, origin, destination, and time-of-day, and uses these as context for an LLM-generated response. This grounds the advisor's recommendations in actual HHH operational data rather than general knowledge.
+In this project, RAG is applied in the policy advisor component: the historical \path{DATA2024.xlsx} dataset serves as the knowledge base. When a dispatcher asks about KPI risk or requests operational suggestions, the system retrieves the $K$ most similar past tasks by service type, origin, destination, and time-of-day, and uses these as context for an LLM-generated response. This grounds the advisor's recommendations in actual HHH operational data rather than general knowledge.
 
 %% ============================================================
 \section{Methods}
@@ -206,29 +209,39 @@ The system comprises four functional layers, as illustrated in Figure~\ref{fig:a
 \centering
 \begin{tikzpicture}[
   box/.style={rectangle, rounded corners=5pt, draw=#1, fill=#1!15,
-              minimum width=3.4cm, minimum height=1.1cm, align=center, font=\small\bfseries},
+              minimum width=2.6cm, minimum height=1.0cm, align=center,
+              font=\small\bfseries, inner sep=3pt},
   arr/.style={-Stealth, thick, gray},
-  lbl/.style={font=\scriptsize, text=gray!70}
+  lbl/.style={font=\scriptsize, text=gray!70, inner sep=1pt}
 ]
-\node[box=blue]   (nlp)    at (0,0)   {NLI Layer\\[-2pt]\small DeepSeek LLM};
-\node[box=green!70!black]  (solver) at (5.2,0)   {Solver Layer\\[-2pt]\small OR-Tools VRPTW};
-\node[box=orange] (ui)     at (10.4,0) {Interface Layer\\[-2pt]\small Flask + JS};
-\node[box=gray]   (data)   at (5.2,-2.4) {Data Layer\\[-2pt]\small 89$\times$89 Matrix\\[-4pt]\small DATA2024.xlsx};
-\node[box=violet] (adv)    at (10.4,-2.4) {Policy Advisor\\[-2pt]\small RAG + LLM};
+% Top row: wide horizontal spacing so arrow gaps are long enough for two-line labels
+\node[box=blue]            (nlp)    at (0,0)     {NLI Layer\\[1pt]\footnotesize DeepSeek LLM};
+\node[box=green!60!black]  (solver) at (6.0,0)   {Solver Layer\\[1pt]\footnotesize OR-Tools VRPTW};
+\node[box=orange]          (ui)     at (12.0,0)  {Interface Layer\\[1pt]\footnotesize Flask + JS};
 
-\node[lbl, left=0.5cm of nlp]   (in)  {\shortstack{Natural language\\request (ZH/EN)}};
-\node[lbl, right=0.5cm of ui]   (out) {\shortstack{Real-time\\dashboard}};
+% Bottom row with extra vertical clearance
+\node[box=gray]            (data)   at (6.0,-3.0)  {Data Layer\\[1pt]\footnotesize 89$\times$89 Matrix};
+\node[box=violet]          (adv)    at (12.0,-3.0) {Policy Advisor\\[1pt]\footnotesize RAG + LLM};
 
+% Input / output labels above top row
+\node[lbl, above=0.55cm of nlp]  (in)  {\textit{NL request (ZH/EN)}};
+\node[lbl, above=0.55cm of ui]   (out) {\textit{Real-time dashboard}};
+
+% Top-row arrows: connect at box edges (.east / .west) so arrows live entirely
+% in the gap. The arrow's `midway` anchor is then at the centre of the gap,
+% giving labels guaranteed clearance from box bodies regardless of box width.
 \draw[arr] (in)  -- (nlp);
-\draw[arr] (nlp) -- node[above,lbl]{Structured JSON} (solver);
-\draw[arr] (solver) -- node[above,lbl]{\shortstack{Assignment +\\explanation}} (ui);
+\draw[arr] (nlp.east) -- node[lbl, midway, above=1pt]{Structured JSON} (solver.west);
+\draw[arr] (solver.east) -- node[lbl, midway, above=1pt, align=center]{Assignment +\\explanation} (ui.west);
 \draw[arr] (ui)  -- (out);
+
+% Bottom connections
 \draw[arr] (data) -- (solver);
 \draw[arr] (data.west) to[out=180,in=270] (nlp.south);
 \draw[arr] (data) -- (adv);
 \draw[arr] (adv) -- (ui);
 \end{tikzpicture}
-\caption{Four-layer hybrid AI dispatch system architecture.}
+\caption{Four-layer hybrid AI dispatch system architecture. Input flows left-to-right from NL request through NLI, Solver, and Interface layers; the Data Layer feeds both the Solver and Policy Advisor.}
 \label{fig:architecture}
 \end{figure}
 
@@ -279,7 +292,7 @@ On every new task arrival and every porter completion event, the solver is re-in
 
 \subsubsection{Travel Time Matrix Construction}
 
-Travel times between all 89 hospital departments were derived from historical DATA2024.xlsx records. For each origin--destination pair, the 75th-percentile (p75) travel time was computed from observed porter journeys, providing a conservative estimate that accounts for typical congestion without being skewed by extreme outliers. For pairs absent from the historical data, a three-level fallback applies: (1) same-floor pairs: 5 minutes; (2) inter-floor pairs: 8 minutes; (3) global p90 fallback: 27.5 minutes. The resulting 89$\times$89 matrix is loaded at system startup and used for all routing and duration computations.
+Travel times between all 89 hospital departments were derived from historical \path{DATA2024.xlsx} records. For each origin--destination pair, the 75th-percentile (p75) travel time was computed from observed porter journeys, providing a conservative estimate that accounts for typical congestion without being skewed by extreme outliers. For pairs absent from the historical data, a three-level fallback applies: (1) same-floor pairs: 5 minutes; (2) inter-floor pairs: 8 minutes; (3) global p90 fallback: 27.5 minutes. The resulting 89$\times$89 matrix is loaded at system startup and used for all routing and duration computations.
 
 \subsection{Layer 3: Web Dashboard}
 
@@ -302,9 +315,9 @@ The policy advisor uses Retrieval-Augmented Generation \cite{lewis2020} to groun
 
 \textbf{Retrieval:} Given an incoming task or query, the system retrieves the $K=10$ most similar historical records using a weighted similarity score:
 \begin{equation}
-\text{sim}(q, r) = w_s \cdot \mathbf{1}[\text{service match}] + w_o \cdot \mathbf{1}[\text{origin match}] + w_d \cdot \mathbf{1}[\text{dest match}] + w_t \cdot \mathbf{1}[\text{time-of-day match}]
+\text{sim}(q, r) = w_s \cdot \mathbf{1}[\text{svc}] + w_o \cdot \mathbf{1}[\text{origin}] + w_d \cdot \mathbf{1}[\text{dest}] + w_t \cdot \mathbf{1}[\text{time-of-day}]
 \end{equation}
-with weights $w_s = 0.4$, $w_o = 0.3$, $w_d = 0.2$, $w_t = 0.1$, reflecting the relative predictive importance of each field for task duration.
+where each indicator $\mathbf{1}[\cdot]$ equals 1 when the corresponding field matches, with weights $w_s = 0.4$, $w_o = 0.3$, $w_d = 0.2$, $w_t = 0.1$, reflecting the relative predictive importance of each field for task duration.
 
 \textbf{Generation:} The retrieved records are formatted as context and passed to the DeepSeek LLM with a task-specific prompt:
 \begin{itemize}
@@ -425,6 +438,7 @@ Table~\ref{tab:sim_results} presents simulation results across fleet sizes and s
 \centering
 \caption{Simulation results: mean total task duration and KPI violation rate.}
 \label{tab:sim_results}
+\vspace{4pt}
 \begin{tabular}{llccc}
 \toprule
 \textbf{Mode} & \textbf{Strategy} & \textbf{Porters} & \textbf{Mean Duration (min)} & \textbf{KPI Violation (\%)} \\
@@ -447,41 +461,6 @@ Synthetic & OR-Tools & 7 & 78.2  & 100.0\% \\
 \end{table}
 
 OR-Tools improvements are most pronounced in synthetic mode where the system operates below saturation. At 5 porters (synthetic), OR-Tools reduces mean total duration from 240.0 to 166.8 minutes --- a \textbf{30.5\% improvement}. At 7 porters (synthetic), the improvement is \textbf{16.9\%}. In replay mode, improvements are marginal (0.5--2\%) because the historical task set is queue-saturated: tasks arrive faster than porters can complete them, and routing optimisation cannot overcome the structural queue bottleneck.
-
-\begin{figure}[H]
-\centering
-\begin{tikzpicture}
-\def\data{
-  {2.3, 2.2, 0.9},
-  {10.2, 30.5, 16.9}
-}
-\begin{scope}[xscale=0.9]
-\node[font=\small\bfseries] at (5.5, 5.8) {OR-Tools Improvement Over Greedy in Mean Total Duration (\%)};
-\node[font=\small] at (1.7, 5.2) {\textbf{Replay Mode}};
-\fill[blue!40] (0.2,0) rectangle (1.2, 2.3) node[above,font=\scriptsize]{2.3\%};
-\fill[blue!40] (1.4,0) rectangle (2.4, 2.2) node[above,font=\scriptsize]{2.2\%};
-\fill[blue!40] (2.6,0) rectangle (3.6, 0.9) node[above,font=\scriptsize]{0.9\%};
-\node[font=\scriptsize] at (0.7,  -0.3) {3};
-\node[font=\scriptsize] at (1.9,  -0.3) {5};
-\node[font=\scriptsize] at (3.1,  -0.3) {7};
-\node[font=\scriptsize] at (1.9,  -0.7) {Fleet size (porters)};
-\node[font=\small] at (7.5, 5.2) {\textbf{Synthetic Mode}};
-\fill[green!50!black!60] (4.8,0) rectangle (5.8, 1.02) node[above,font=\scriptsize]{10.2\%};
-\fill[green!50!black!60] (6.0,0) rectangle (7.0, 3.05) node[above,font=\scriptsize]{30.5\%};
-\fill[green!50!black!60] (7.2,0) rectangle (8.2, 1.69) node[above,font=\scriptsize]{16.9\%};
-\node[font=\scriptsize] at (5.3,  -0.3) {3};
-\node[font=\scriptsize] at (6.5,  -0.3) {5};
-\node[font=\scriptsize] at (7.7,  -0.3) {7};
-\node[font=\scriptsize] at (6.5,  -0.7) {Fleet size (porters)};
-\draw[->] (0,0) -- (0,5.5) node[left,font=\scriptsize]{Improvement (\%)};
-\foreach \y in {0,1,2,3,4,5}
-  \draw (-0.1,\y) -- (0.1,\y) node[left,font=\scriptsize]{\y0\%};
-\node[font=\scriptsize,left] at (-0.15, 0) {0\%};
-\end{scope}
-\end{tikzpicture}
-\caption{Percentage improvement of OR-Tools over greedy in mean total task duration, by fleet size and simulation mode. Synthetic mode shows substantially larger gains because the system is not queue-saturated.}
-\label{fig:improvement}
-\end{figure}
 
 \subsection{Pickup-Time KPI Analysis}
 
@@ -511,6 +490,63 @@ Table~\ref{tab:pickup} presents pickup-time results from the synthetic simulatio
 \bottomrule
 \end{tabular}
 \end{table}
+
+Figure~\ref{fig:pickup} visualises the pickup-time results and makes the KPI threshold (dashed red line) directly comparable across fleet sizes and strategies.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  ybar,
+  bar width=0.45cm,
+  bar shift auto,
+  width=14cm, height=8cm,
+  % Legend below the x-axis label to avoid overlapping bars
+  legend style={at={(0.5,-0.20)}, anchor=north, legend columns=2,
+                font=\small, draw=gray!50,
+                /tikz/every even column/.append style={column sep=0.5cm}},
+  ylabel={Mean Time-to-Pickup (min)},
+  xlabel={Fleet Size (porters)},
+  symbolic x coords={5,7,10,15},
+  xtick=data,
+  ymin=0, ymax=240,
+  % Standard ticks (no 15 here to avoid crowding 30)
+  ytick={0,30,60,90,120,150,180,210},
+  % Add 15 as an extra tick with its own style — labelled in red
+  extra y ticks={15},
+  extra y tick labels={15},
+  extra y tick style={
+    grid=none,
+    tick label style={red, font=\scriptsize},
+    major tick length=4pt,
+  },
+  nodes near coords,
+  nodes near coords align={vertical},
+  every node near coord/.append style={font=\scriptsize,
+    /pgf/number format/.cd, fixed, precision=1},
+  grid=major,
+  grid style={dashed,gray!30},
+  enlarge x limits=0.20,
+  clip=false,
+]
+\addplot[fill=blue!40, draw=blue!70] coordinates {
+  (5,204.5) (7,58.6) (10,20.0) (15,15.9)
+};
+\addplot[fill=green!50!black!50, draw=green!50!black!80] coordinates {
+  (5,131.3) (7,42.7) (10,20.1) (15,15.9)
+};
+% KPI horizontal reference line spanning the full plotting area
+\draw[red, dashed, ultra thick]
+  (axis cs:5,15) -- (axis cs:15,15);
+% KPI label placed in the top-right of the plot, well clear of all bars
+\node[red, font=\scriptsize, anchor=north east]
+  at (rel axis cs:0.99,0.97) {KPI target = 15 min};
+\legend{Greedy, OR-Tools}
+\end{axis}
+\end{tikzpicture}
+\caption{Mean time-to-pickup (porter arrival at origin) by fleet size and strategy. The dashed red line marks the 15-minute KPI target (also indicated by the red ``15'' on the y-axis). OR-Tools reduces pickup time substantially at 5 and 7 porters; both strategies converge at 15 porters where mean pickup approaches the KPI. Values in Table~\ref{tab:pickup}.}
+\label{fig:pickup}
+\end{figure}
 
 Three findings are notable:
 
