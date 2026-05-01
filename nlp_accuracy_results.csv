@@ -1,0 +1,101 @@
+sentence,gt_priority,llm_priority,priority_match,gt_service,llm_service,service_match,gt_from,llm_from,from_match,gt_to,llm_to,to_match,gt_infection,llm_infection,infection_match,all_correct,llm_failed
+超緊急 送入院 從 A&D 往 A&D,Super-Urgent,Super-Urgent,True,送入院,送入院,True,A&D,A&D,True,A&D,A&D,True,False,False,True,True,False
+超緊急 送入院 從 A&D 往 A&D,Super-Urgent,Super-Urgent,True,送入院,送入院,True,A&D,A&D,True,A&D,A&D,True,False,False,True,True,False
+回人 從 X光部 往 3E,Normal,Normal,True,送病人,送病人,True,X光部,X光部,True,3E,3E,True,False,False,True,True,False
+送3F X光 從 1B 往 3FXRAY,Normal,Normal,True,送3F X光,送3F X光,True,1B,1B,True,3FXRAY,3FXRAY,True,False,False,True,True,False
+超緊急 送入院 從 A&D 往 A&D,Super-Urgent,Super-Urgent,True,送入院,送入院,True,A&D,A&D,True,A&D,A&D,True,False,False,True,True,False
+超緊急 送入院 從 A&D 往 A&D,Super-Urgent,Super-Urgent,True,送入院,送入院,True,A&D,A&D,True,A&D,A&D,True,False,False,True,True,False
+超緊急 送標本 從 5H 往 化驗室,Super-Urgent,Super-Urgent,True,送標本,送標本,True,5H,5H,True,化驗室,化驗室,True,False,False,True,True,False
+超緊急 NEATS病人 從 2A 往 A&D,Super-Urgent,Super-Urgent,True,送病人,送病人,True,2A,2A,True,A&D,A&D,True,False,False,True,True,False
+超緊急 送入院 從 A&D 往 SDU,Super-Urgent,Super-Urgent,True,送入院,送入院,True,A&D,A&D,True,SDU,SDU,True,False,False,True,True,False
+即時 送X光 從 1B 往 X光部,Urgent,Normal,False,送3F X光,送3F X光,True,1B,1B,True,X光部,X光部,True,False,False,True,False,False
+超緊急 送入院 從 A&D 往 A&D,Super-Urgent,Super-Urgent,True,送入院,送入院,True,A&D,A&D,True,A&D,A&D,True,False,False,True,True,False
+送標本 從 5L 往 化驗室,Normal,Normal,True,送標本,送標本,True,5L,5L,True,化驗室,化驗室,True,False,False,True,True,False
+即時 送3F X光 從 5H 往 3FXRAY,Urgent,Urgent,True,送3F X光,送3F X光,True,5H,5H,True,3FXRAY,3FXRAY,True,False,False,True,True,False
+送標本 從 1B 往 化驗室,Normal,Normal,True,送標本,送標本,True,1B,1B,True,化驗室,化驗室,True,False,False,True,True,False
+回人 從 X光部 往 3C,Normal,Normal,True,送病人,送病人,True,X光部,X光部,True,3C,3C,True,False,False,True,True,False
+超緊急 送入院 從 A&D 往 A&D,Super-Urgent,Super-Urgent,True,送入院,送入院,True,A&D,A&D,True,A&D,A&D,True,False,False,True,True,False
+送標本 從 CDU 往 化驗室,Normal,Normal,True,送標本,送標本,True,CDU,CDU,True,化驗室,化驗室,True,False,False,True,True,False
+超緊急 送入院 從 A&D 往 A&D,Super-Urgent,Super-Urgent,True,送入院,送入院,True,A&D,A&D,True,A&D,A&D,True,False,False,True,True,False
+超緊急 送入院 從 A&D 往 A&D,Super-Urgent,Super-Urgent,True,送入院,送入院,True,A&D,A&D,True,A&D,A&D,True,False,False,True,True,False
+超緊急 送入院 從 A&D 往 A&D,Super-Urgent,Super-Urgent,True,送入院,送入院,True,A&D,A&D,True,A&D,A&D,True,False,False,True,True,False
+送標本 從 7H 往 化驗室,Normal,Normal,True,送標本,送標本,True,7H,7H,True,化驗室,化驗室,True,False,False,True,True,False
+超緊急 送入院 從 A&D 往 A&D,Super-Urgent,Super-Urgent,True,送入院,送入院,True,A&D,A&D,True,A&D,A&D,True,False,False,True,True,False
+回人 從 3FXRAY 往 3C,Normal,Normal,True,送病人,default,False,3FXRAY,3FXRAY,True,3C,3C,True,False,False,True,False,False
+超緊急 送入院 從 A&D 往 A&D,Super-Urgent,Super-Urgent,True,送入院,送入院,True,A&D,A&D,True,A&D,A&D,True,False,False,True,True,False
+送X光 從 2A 往 X光部,Normal,Normal,True,送3F X光,送3F X光,True,2A,2A,True,X光部,X光部,True,False,False,True,True,False
+回人 從 X光部 往 4D,Normal,Normal,True,送病人,送病人,True,X光部,X光部,True,4D,4D,True,False,False,True,True,False
+回人 從 3FXRAY 往 5H,Normal,Normal,True,送病人,送病人,True,3FXRAY,3FXRAY,True,5H,5H,True,False,False,True,True,False
+超緊急 送X光 從 3E 往 X光部,Super-Urgent,Super-Urgent,True,送3F X光,送3F X光,True,3E,3E,True,X光部,X光部,True,False,False,True,True,False
+即時 送3F X光 從 3H 往 3FXRAY,Urgent,Normal,False,送3F X光,送3F X光,True,3H,3H,True,3FXRAY,3FXRAY,True,False,False,True,False,False
+回人 從 3FXRAY 往 3L,Normal,Normal,True,送病人,送病人,True,3FXRAY,3FXRAY,True,3L,3L,True,False,False,True,True,False
+回人 從 X光部 往 3L,Normal,Normal,True,送病人,送病人,True,X光部,X光部,True,3L,3L,True,False,False,True,True,False
+送X光 從 3C 往 X光部,Normal,Normal,True,送3F X光,送3F X光,True,3C,3C,True,X光部,X光部,True,False,False,True,True,False
+回人 從 X光部 往 1A,Normal,Normal,True,送病人,送病人,True,X光部,X光部,True,1A,1A,True,False,False,True,True,False
+回人 從 X光部 往 1B,Normal,Normal,True,送病人,送病人,True,X光部,X光部,True,1B,1B,True,False,False,True,True,False
+超緊急 NEATS病人 從 3H 往 A&D,Super-Urgent,Super-Urgent,True,送病人,送病人,True,3H,3H,True,A&D,A&D,True,False,False,True,True,False
+送X光 從 3C 往 X光部,Normal,Normal,True,送3F X光,送3F X光,True,3C,3C,True,X光部,X光部,True,False,False,True,True,False
+回人 從 X光部 往 2A,Normal,Normal,True,送病人,送病人,True,X光部,X光部,True,2A,2A,True,False,False,True,True,False
+超緊急 NEATS病人 從 2A 往 A&D,Super-Urgent,Super-Urgent,True,送病人,送病人,True,2A,2A,True,A&D,A&D,True,False,False,True,True,False
+超緊急 送病人 從 4D 往 3FCP,Super-Urgent,Super-Urgent,True,送病人,送病人,True,4D,4D,True,3FCP,3FCP,True,False,False,True,True,False
+超緊急 回人 從 3FXRAY 往 5L,Super-Urgent,Super-Urgent,True,送病人,送病人,True,3FXRAY,3FXRAY,True,5L,5L,True,False,False,True,True,False
+送X光 從 3C 往 X光部,Normal,Normal,True,送3F X光,送3F X光,True,3C,3C,True,X光部,X光部,True,False,False,True,True,False
+超緊急 送入院 從 A&D 往 A&D,Super-Urgent,Super-Urgent,True,送入院,送入院,True,A&D,A&D,True,A&D,A&D,True,False,False,True,True,False
+即時 送3F X光 從 6L 往 3FXRAY,Urgent,Normal,False,送3F X光,送3F X光,True,6L,6L,True,3FXRAY,3FXRAY,True,False,False,True,False,False
+回人 從 3FXRAY 往 3C,Normal,Normal,True,送病人,送病人,True,3FXRAY,3FXRAY,True,3C,3C,True,False,False,True,True,False
+送標本 從 5H 往 化驗室,Normal,Normal,True,送標本,送標本,True,5H,5H,True,化驗室,化驗室,True,False,False,True,True,False
+超緊急 送病人 從 1A 往 2F矯形,Super-Urgent,Super-Urgent,True,送病人,送病人,True,1A,1A,True,2F矯形,2F矯形,True,False,False,True,True,False
+即時 送3F X光 從 3L 往 3FXRAY,Urgent,Urgent,True,送3F X光,送3F X光,True,3L,3L,True,3FXRAY,3FXRAY,True,False,False,True,True,False
+送3F X光 從 1A 往 3FXRAY,Normal,Normal,True,送3F X光,送3F X光,True,1A,1A,True,3FXRAY,3FXRAY,True,False,False,True,True,False
+超緊急 送入院 從 A&D 往 A&D,Super-Urgent,Super-Urgent,True,送入院,送入院,True,A&D,A&D,True,A&D,A&D,True,False,False,True,True,False
+超緊急 送入院 從 A&D 往 A&D,Super-Urgent,Super-Urgent,True,送入院,送入院,True,A&D,A&D,True,A&D,A&D,True,False,False,True,True,False
+送X光 從 3B 往 X光部,Normal,Normal,True,送3F X光,送3F X光,True,3B,3B,True,X光部,X光部,True,False,False,True,True,False
+超緊急 NEATS病人 從 7H 往 A&D,Super-Urgent,Super-Urgent,True,送病人,送病人,True,7H,7H,True,A&D,A&D,True,False,False,True,True,False
+超緊急 NEATS病人 從 3C 往 A&D,Super-Urgent,Super-Urgent,True,送病人,送病人,True,3C,3C,True,A&D,A&D,True,False,True,False,False,False
+回人 從 X光部 往 1B,Normal,Normal,True,送病人,送病人,True,X光部,X光部,True,1B,1B,True,False,False,True,True,False
+回人 從 X光部 往 1B,Normal,Normal,True,送病人,送病人,True,X光部,X光部,True,1B,1B,True,False,False,True,True,False
+回人 從 3FXRAY 往 6L,Normal,Normal,True,送病人,送病人,True,3FXRAY,3FXRAY,True,6L,6L,True,False,False,True,True,False
+即時 送X光 從 6H 往 X光部,Urgent,Normal,False,送3F X光,送3F X光,True,6H,6H,True,X光部,X光部,True,False,False,True,False,False
+即時 送X光 從 3E 往 X光部,Urgent,Normal,False,送3F X光,送3F X光,True,3E,3E,True,X光部,X光部,True,False,False,True,False,False
+即時 送3F X光 從 3L 往 3FXRAY,Urgent,Normal,False,送3F X光,送3F X光,True,3L,3L,True,3FXRAY,3FXRAY,True,False,False,True,False,False
+回人 從 X光部 往 3C,Normal,Normal,True,送病人,送病人,True,X光部,X光部,True,3C,3C,True,False,False,True,True,False
+送標本 從 2B 往 化驗室,Normal,Normal,True,送標本,送標本,True,2B,2B,True,化驗室,化驗室,True,False,False,True,True,False
+超緊急 送入院 從 A&D 往 SDU,Super-Urgent,Super-Urgent,True,送入院,送入院,True,A&D,A&D,True,SDU,SDU,True,False,False,True,True,False
+超緊急 NEATS病人 從 5L 往 A&D,Super-Urgent,Super-Urgent,True,送病人,送病人,True,5L,5L,True,A&D,A&D,True,False,False,True,True,False
+送X光 從 4D 往 X光部,Normal,Normal,True,送3F X光,送3F X光,True,4D,4D,True,X光部,X光部,True,False,False,True,True,False
+回人 從 3FXRAY 往 6H,Normal,Normal,True,送病人,送病人,True,3FXRAY,3FXRAY,True,6H,6H,True,False,False,True,True,False
+回人 從 X光部 往 3E,Normal,Normal,True,送病人,送病人,True,X光部,X光部,True,3E,3E,True,False,False,True,True,False
+即時 送X光 從 4D 往 X光部,Urgent,Urgent,True,送3F X光,送3F X光,True,4D,4D,True,X光部,X光部,True,False,False,True,True,False
+送X光 從 3C 往 X光部,Normal,Normal,True,送3F X光,default,False,3C,3C,True,X光部,X光部,True,False,False,True,False,False
+超緊急 送標本 從 7H 往 化驗室,Super-Urgent,Super-Urgent,True,送標本,送標本,True,7H,7H,True,化驗室,化驗室,True,False,False,True,True,False
+超緊急 NEATS病人 從 6L 往 A&D ，需注意感染控制,Super-Urgent,Super-Urgent,True,送病人,送病人,True,6L,6L,True,A&D,A&D,True,True,False,False,False,False
+回人 從 X光部 往 4D,Normal,Normal,True,送病人,送病人,True,X光部,X光部,True,4D,4D,True,False,False,True,True,False
+回人 從 X光部 往 2A,Normal,Normal,True,送病人,送病人,True,X光部,X光部,True,2A,2A,True,False,False,True,True,False
+即時 送X光 從 1B 往 X光部,Urgent,Normal,False,送3F X光,送3F X光,True,1B,1B,True,X光部,X光部,True,False,False,True,False,False
+送標本 從 3E 往 化驗室,Normal,Normal,True,送標本,送標本,True,3E,3E,True,化驗室,化驗室,True,False,False,True,True,False
+回人 從 3FXRAY 往 1B,Normal,Normal,True,送病人,送病人,True,3FXRAY,3FXRAY,True,1B,1B,True,False,False,True,True,False
+送標本 從 1A 往 化驗室,Normal,Normal,True,送標本,送標本,True,1A,1A,True,化驗室,化驗室,True,False,False,True,True,False
+送標本 從 3B 往 化驗室,Normal,Normal,True,送標本,送標本,True,3B,3B,True,化驗室,化驗室,True,False,False,True,True,False
+超緊急 NEATS病人 從 5L 往 A&D,Super-Urgent,Super-Urgent,True,送病人,送病人,True,5L,5L,True,A&D,A&D,True,False,False,True,True,False
+即時 送3F X光 從 6H 往 3FXRAY,Urgent,Normal,False,送3F X光,送3F X光,True,6H,6H,True,3FXRAY,3FXRAY,True,False,False,True,False,False
+即時 送3F X光 從 7H 往 3FXRAY,Urgent,Urgent,True,送3F X光,送3F X光,True,7H,7H,True,3FXRAY,3FXRAY,True,False,False,True,True,False
+即時 送X光 從 3E 往 X光部,Urgent,Normal,False,送3F X光,送3F X光,True,3E,3E,True,X光部,X光部,True,False,False,True,False,False
+即時 送3F X光 從 5H 往 3FXRAY,Urgent,Normal,False,送3F X光,送3F X光,True,5H,5H,True,3FXRAY,3FXRAY,True,False,False,True,False,False
+回人 從 3FXRAY 往 1B,Normal,Normal,True,送病人,送病人,True,3FXRAY,3FXRAY,True,1B,1B,True,False,False,True,True,False
+超緊急 NEATS病人 從 6L 往 A&D,Super-Urgent,Super-Urgent,True,送病人,送病人,True,6L,6L,True,A&D,A&D,True,False,False,True,True,False
+回人 從 X光部 往 2A,Normal,Normal,True,送病人,送病人,True,X光部,X光部,True,2A,2A,True,False,False,True,True,False
+回人 從 X光部 往 1B,Normal,Normal,True,送病人,送病人,True,X光部,X光部,True,1B,1B,True,False,False,True,True,False
+即時 送X光 從 4D 往 X光部,Urgent,Normal,False,送3F X光,送3F X光,True,4D,4D,True,X光部,X光部,True,False,False,True,False,False
+送標本 從 6L 往 化驗室,Normal,Normal,True,送標本,送標本,True,6L,6L,True,化驗室,化驗室,True,False,False,True,True,False
+回人 從 3FXRAY 往 5H,Normal,Normal,True,送病人,送病人,True,3FXRAY,3FXRAY,True,5H,5H,True,False,False,True,True,False
+即時 送X光 從 1A 往 X光部,Urgent,Normal,False,送3F X光,送3F X光,True,1A,1A,True,X光部,X光部,True,False,False,True,False,False
+回人 從 X光部 往 3E,Normal,Normal,True,送病人,送病人,True,X光部,X光部,True,3E,3E,True,False,False,True,True,False
+送標本 從 標本室 往 大堂,Normal,Normal,True,送標本,送標本,True,標本室,標本室,True,大堂,大堂,True,False,False,True,True,False
+送X光 從 3C 往 X光部,Normal,Normal,True,送3F X光,送3F X光,True,3C,3C,True,X光部,X光部,True,False,False,True,True,False
+超緊急 送入院 從 A&D 往 A&D,Super-Urgent,Super-Urgent,True,送入院,送入院,True,A&D,A&D,True,A&D,A&D,True,False,False,True,True,False
+超緊急 送入院 從 A&D 往 A&D,Super-Urgent,Super-Urgent,True,送入院,送入院,True,A&D,A&D,True,A&D,A&D,True,False,False,True,True,False
+超緊急 送入院 從 A&D 往 A&D,Super-Urgent,Super-Urgent,True,送入院,送入院,True,A&D,A&D,True,A&D,A&D,True,False,False,True,True,False
+送病人 從 5L 往 3FXRAY,Normal,Normal,True,送病人,送病人,True,5L,5L,True,3FXRAY,3FXRAY,True,False,False,True,True,False
+即時 送X光 從 1A 往 X光部,Urgent,Urgent,True,送3F X光,送3F X光,True,1A,1A,True,X光部,X光部,True,False,False,True,True,False
+即時 送X光 從 4D 往 X光部,Urgent,Urgent,True,送3F X光,送3F X光,True,4D,4D,True,X光部,X光部,True,False,False,True,True,False
+即時 送3F X光 從 5H 往 3FXRAY,Urgent,Urgent,True,送3F X光,送3F X光,True,5H,5H,True,3FXRAY,3FXRAY,True,False,False,True,True,False

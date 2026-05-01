@@ -1,0 +1,40 @@
+\contentsline {section}{\numberline {1}Introduction}{5}{section.1}%
+\contentsline {subsection}{\numberline {1.1}Background and Motivation}{5}{subsection.1.1}%
+\contentsline {subsection}{\numberline {1.2}Problem Statement}{5}{subsection.1.2}%
+\contentsline {subsection}{\numberline {1.3}Project Objectives}{6}{subsection.1.3}%
+\contentsline {subsection}{\numberline {1.4}Report Structure}{6}{subsection.1.4}%
+\contentsline {section}{\numberline {2}Background}{6}{section.2}%
+\contentsline {subsection}{\numberline {2.1}Intra-Hospital Transport Logistics}{6}{subsection.2.1}%
+\contentsline {subsection}{\numberline {2.2}Dynamic Vehicle Routing Problem}{7}{subsection.2.2}%
+\contentsline {subsection}{\numberline {2.3}Vehicle Routing Problem with Time Windows}{7}{subsection.2.3}%
+\contentsline {subsection}{\numberline {2.4}Google OR-Tools for Routing Optimisation}{8}{subsection.2.4}%
+\contentsline {subsection}{\numberline {2.5}Large Language Models for Information Extraction}{8}{subsection.2.5}%
+\contentsline {subsection}{\numberline {2.6}Retrieval-Augmented Generation}{8}{subsection.2.6}%
+\contentsline {section}{\numberline {3}Methods}{9}{section.3}%
+\contentsline {subsection}{\numberline {3.1}System Architecture Overview}{9}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}Layer 1: Natural Language Interface (NLI)}{9}{subsection.3.2}%
+\contentsline {subsection}{\numberline {3.3}Layer 2: OR-Tools VRPTW Solver}{10}{subsection.3.3}%
+\contentsline {subsubsection}{\numberline {3.3.1}Problem Formulation}{10}{subsubsection.3.3.1}%
+\contentsline {subsubsection}{\numberline {3.3.2}Rolling-Horizon Re-optimisation}{11}{subsubsection.3.3.2}%
+\contentsline {subsubsection}{\numberline {3.3.3}Travel Time Matrix Construction}{11}{subsubsection.3.3.3}%
+\contentsline {subsection}{\numberline {3.4}Layer 3: Web Dashboard}{11}{subsection.3.4}%
+\contentsline {subsection}{\numberline {3.5}Policy Advisor: RAG Design}{12}{subsection.3.5}%
+\contentsline {subsection}{\numberline {3.6}Scheduled Tasks Feature}{12}{subsection.3.6}%
+\contentsline {subsection}{\numberline {3.7}Discrete-Event Simulation}{13}{subsection.3.7}%
+\contentsline {section}{\numberline {4}Results}{13}{section.4}%
+\contentsline {subsection}{\numberline {4.1}NLP Parsing Accuracy}{13}{subsection.4.1}%
+\contentsline {subsection}{\numberline {4.2}NLP Error Analysis}{14}{subsection.4.2}%
+\contentsline {subsection}{\numberline {4.3}Historical Performance Baseline}{15}{subsection.4.3}%
+\contentsline {subsection}{\numberline {4.4}Simulation Results: Greedy vs.\ OR-Tools}{16}{subsection.4.4}%
+\contentsline {subsection}{\numberline {4.5}Pickup-Time KPI Analysis}{17}{subsection.4.5}%
+\contentsline {subsection}{\numberline {4.6}Fleet Scaling and KPI Feasibility}{18}{subsection.4.6}%
+\contentsline {section}{\numberline {5}Discussion}{18}{section.5}%
+\contentsline {subsection}{\numberline {5.1}System Contributions}{18}{subsection.5.1}%
+\contentsline {subsection}{\numberline {5.2}Comparison with Prior Work}{19}{subsection.5.2}%
+\contentsline {subsection}{\numberline {5.3}Limitations}{20}{subsection.5.3}%
+\contentsline {subsection}{\numberline {5.4}Critical Evaluation of Design Choices}{20}{subsection.5.4}%
+\contentsline {section}{\numberline {6}Conclusion}{21}{section.6}%
+\contentsline {section}{\numberline {A}System API Reference}{23}{appendix.A}%
+\contentsline {section}{\numberline {B}Software Dependencies}{23}{appendix.B}%
+\contentsline {section}{\numberline {C}LLM System Prompt Design}{23}{appendix.C}%
+\contentsline {section}{\numberline {D}NLP Test Sample Sentences}{24}{appendix.D}%

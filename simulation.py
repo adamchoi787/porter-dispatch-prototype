@@ -99,6 +99,7 @@ class TaskResult:
     completion_time: Optional[float] = None
     porter_id: Optional[str] = None
     total_duration: Optional[float] = None  # completion_time - request_time
+    pickup_time: Optional[float] = None     # queueing_wait + travel_porter→origin
 
 
 # ── Data loading ──────────────────────────────────────────────────────
@@ -289,6 +290,7 @@ def run_simulation(tasks, travel_matrix, num_porters, strategy='ortools', kpi_li
                 tr.completion_time = sim_time + total_duration
                 tr.porter_id = porter_id
                 tr.total_duration = tr.completion_time - tr.request_time
+                tr.pickup_time = (sim_time - tr.request_time) + travel_to_origin
 
             # Remove from pending
             pending_tasks.remove(task)
@@ -346,6 +348,9 @@ def compute_metrics(results, kpi_limit=15.0):
     durations = [r.total_duration for r in completed]
     violations = [d for d in durations if d > kpi_limit]
 
+    pickup_times = [r.pickup_time for r in completed if r.pickup_time is not None]
+    pickup_violations = [t for t in pickup_times if t > kpi_limit]
+
     return {
         'total': len(results),
         'completed': len(completed),
@@ -356,6 +361,8 @@ def compute_metrics(results, kpi_limit=15.0):
         'kpi_violations': len(violations),
         'kpi_violation_rate': len(violations) / len(completed) * 100,
         'mean_wait': sum(r.assign_time - r.request_time for r in completed if r.assign_time is not None) / len(completed),
+        'mean_pickup_time': sum(pickup_times) / len(pickup_times) if pickup_times else float('nan'),
+        'pickup_kpi_violation_rate': len(pickup_violations) / len(completed) * 100 if completed else float('nan'),
     }
 
 

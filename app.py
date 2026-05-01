@@ -71,9 +71,18 @@ def handle_dispatch():
         results = system.dispatch_new_task(user_request)
 
         assignments = []
+        scheduled_items = []
         queued_count = 0
         for result in results:
-            if result:
+            if result and len(result) == 4 and result[0] == 'scheduled':
+                _, task, scheduled_at, entry_id = result
+                scheduled_items.append({
+                    "status": "Scheduled",
+                    "id": entry_id,
+                    "task": task,
+                    "scheduled_at": scheduled_at.isoformat(),
+                })
+            elif result:
                 porter, task, duration = result
                 available = [p for p in system.porters if p.status == 'available' or p.id == porter.id]
                 explanation = system.explain_dispatch(porter, task, duration, available)
@@ -93,6 +102,7 @@ def handle_dispatch():
 
         response = {
             "assignments": assignments,
+            "scheduled": scheduled_items,
             "queued": queued_count,
             "queue_length": len(system.task_queue),
             "errors": errors
@@ -146,6 +156,38 @@ def undo_dispatch():
         return jsonify({"error": "System not initialized"}), 500
     success, message = system.undo_last_dispatch()
     return jsonify({"success": success, "message": message})
+
+
+@app.route('/scheduled', methods=['GET'])
+def get_scheduled():
+    """List all pending scheduled tasks with time remaining."""
+    if not system:
+        return jsonify({"error": "System not initialized"}), 500
+
+    import datetime
+    now = datetime.datetime.now()
+    entries = []
+    with system._scheduled_lock:
+        for entry in system.scheduled_queue:
+            seconds_until = max(0, int((entry['scheduled_at'] - now).total_seconds()))
+            entries.append({
+                "id": entry['id'],
+                "task": entry['task'],
+                "scheduled_at": entry['scheduled_at'].isoformat(),
+                "seconds_until": seconds_until,
+            })
+    return jsonify({"scheduled_tasks": entries})
+
+
+@app.route('/scheduled/<entry_id>', methods=['DELETE'])
+def cancel_scheduled(entry_id):
+    """Cancel a scheduled task by id."""
+    if not system:
+        return jsonify({"error": "System not initialized"}), 500
+    removed = system.cancel_scheduled_task(entry_id)
+    if removed:
+        return jsonify({"success": True, "message": f"Scheduled task {entry_id} cancelled."})
+    return jsonify({"success": False, "message": f"No scheduled task with id {entry_id}."}), 404
 
 
 @app.route('/complete/<porter_id>', methods=['POST'])

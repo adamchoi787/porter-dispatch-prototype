@@ -130,6 +130,7 @@ class ChatGPTLLM:
         )
         
         self.system_prompt = self._build_system_prompt()
+        self._current_time_str = None  # set externally before each call if needed
         print("ChatGPTLLM Initialized (using DeepSeek).")
 
     def _build_system_prompt(self):
@@ -151,7 +152,8 @@ class ChatGPTLLM:
               "to": "DESTINATION_LOCATION",
               "service": "SERVICE_TYPE",
               "priority": "PRIORITY_LEVEL",
-              "equipment": ["EQUIPMENT_1", "EQUIPMENT_2", ...]
+              "equipment": ["EQUIPMENT_1", "EQUIPMENT_2", ...],
+              "scheduled_at": "ISO8601_DATETIME_OR_NULL"
             }}
           ]
         }}
@@ -166,8 +168,14 @@ class ChatGPTLLM:
             - Only split into multiple tasks if the request clearly describes separate, independent journeys (e.g. different items or people going to different places).
         6.  If the request describes multiple independent tasks, include ALL of them in the "tasks" array.
         7.  If you cannot determine a value, use "Unknown".
+        8.  "scheduled_at": If the request mentions a future time (e.g. "at 14:30", "in 2 hours", "tomorrow at 9am"), resolve it to an absolute ISO 8601 datetime string (e.g. "2026-04-16T14:30:00"). The current time is {{CURRENT_TIME}}. If the task should be dispatched immediately, set "scheduled_at" to null.
         """
         return prompt
+
+    def build_prompt_for_request(self):
+        """Return the system prompt with the current time substituted in."""
+        now_str = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+        return self.system_prompt.replace('{CURRENT_TIME}', now_str)
 
     def get_structured_tasks(self, user_request):
         """Parses the natural language request into a list of structured task dicts."""
@@ -177,7 +185,7 @@ class ChatGPTLLM:
             response = self.client.chat.completions.create(
                 model="deepseek-chat",
                 messages=[
-                    {"role": "system", "content": self.system_prompt},
+                    {"role": "system", "content": self.build_prompt_for_request()},
                     {"role": "user", "content": user_request}
                 ],
                 response_format={"type": "json_object"}
@@ -216,8 +224,11 @@ class PorterDispatchSystem:
         self.llm_engine = ChatGPTLLM() if use_llm else None
         self.solver = PorterDispatchSolver(self.travel_matrix, self.task_time_map)
         self.task_queue = []
+        self.scheduled_queue = []   # list of {task, scheduled_at: datetime, id: str}
         self.last_dispatch = None   # undo snapshot: {assigned: [...], queued: [...]}
         self.last_task_errors = []  # validation errors from the most recent dispatch call
+        self._scheduled_lock = threading.Lock()
+        self._start_scheduler()
 
     def _create_fleet(self, num_porters):
         """Create a fleet of porters with round-robin starting locations from the travel matrix."""
@@ -234,6 +245,53 @@ class PorterDispatchSystem:
             loc = preferred[i % len(preferred)]
             porters.append(Porter(pid, loc))
         return porters
+
+    def _start_scheduler(self):
+        """Background thread that checks every 30s and releases due scheduled tasks."""
+        def scheduler_loop():
+            while True:
+                time.sleep(30)
+                self._release_due_scheduled_tasks()
+
+        t = threading.Thread(target=scheduler_loop, daemon=True)
+        t.start()
+        print("[Scheduler] Background scheduler started (30s interval).")
+
+    def _release_due_scheduled_tasks(self):
+        """Move any scheduled tasks whose scheduled_at has passed into normal dispatch."""
+        now = datetime.now()
+        with self._scheduled_lock:
+            due = [entry for entry in self.scheduled_queue if entry['scheduled_at'] <= now]
+            self.scheduled_queue = [entry for entry in self.scheduled_queue if entry['scheduled_at'] > now]
+
+        for entry in due:
+            task = entry['task']
+            print(f"[Scheduler] Releasing scheduled task {entry['id']}: {task.get('service')} {task.get('from')}→{task.get('to')}")
+            self.dispatch_structured_task(task)
+
+    def schedule_task(self, structured_task, scheduled_at):
+        """
+        Add a task to the scheduled queue to be dispatched at scheduled_at (datetime).
+        Returns the scheduled entry id.
+        """
+        import uuid
+        entry_id = str(uuid.uuid4())[:8]
+        entry = {
+            'id': entry_id,
+            'task': structured_task,
+            'scheduled_at': scheduled_at,
+        }
+        with self._scheduled_lock:
+            self.scheduled_queue.append(entry)
+        print(f"[Scheduler] Task {entry_id} scheduled for {scheduled_at.isoformat()}: {structured_task.get('service')} {structured_task.get('from')}→{structured_task.get('to')}")
+        return entry_id
+
+    def cancel_scheduled_task(self, entry_id):
+        """Remove a scheduled task by id. Returns True if found and removed."""
+        with self._scheduled_lock:
+            before = len(self.scheduled_queue)
+            self.scheduled_queue = [e for e in self.scheduled_queue if e['id'] != entry_id]
+            return len(self.scheduled_queue) < before
 
     def _on_task_complete(self, porter_id):
         """Callback triggered when a task auto-completes after its timer expires."""
@@ -385,6 +443,17 @@ class PorterDispatchSystem:
 
         results = []
         for task in structured_tasks:
+            scheduled_at_str = task.pop('scheduled_at', None)
+            if scheduled_at_str:
+                # Parse ISO datetime from LLM
+                try:
+                    scheduled_at = datetime.fromisoformat(scheduled_at_str)
+                    if scheduled_at > datetime.now():
+                        entry_id = self.schedule_task(task, scheduled_at)
+                        results.append(('scheduled', task, scheduled_at, entry_id))
+                        continue
+                except (ValueError, TypeError):
+                    pass  # Malformed — dispatch immediately
             results.append(self.dispatch_structured_task(task, tracking=tracking))
 
         self.last_dispatch = tracking
