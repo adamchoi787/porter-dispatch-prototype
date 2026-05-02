@@ -85,7 +85,7 @@ Department of Industrial Engineering \& Decision Analytics, HKUST}
 \newpage
 \section*{Preface}
 
-This report documents the design, implementation, and evaluation of an AI-driven porter dispatch system developed for HHH as a two-semester Final Year Project in Industrial Engineering and Decision Analytics. The project spans natural language processing, vehicle routing optimisation, real-time web systems, and data-driven policy analysis.
+This report documents the design, implementation, and evaluation of an AI-driven porter dispatch system developed for Haven of Hope Hospital (HHH) as a two-semester Final Year Project in Industrial Engineering and Decision Analytics. The project spans natural language processing, vehicle routing optimisation, real-time web systems, and data-driven policy analysis.
 
 \vspace{0.8em}
 \textbf{Team Contributions:}
@@ -110,7 +110,7 @@ The team thanks Prof.\ Xiangtong QI for his guidance and feedback throughout bot
 \newpage
 \section*{Abstract}
 
-Hospital porter services are a critical component of clinical workflow, yet in many institutions dispatch remains a manual, radio-based process that routinely fails to meet operational targets. At HHH, porters are tasked with transporting patients, specimens, and equipment between 89 hospital departments. The stated Key Performance Indicator (KPI) requires a porter to arrive at the pickup location within 15 minutes of an order being placed. Analysis of 2,843 historical records from 2024 reveals that this target is violated in the majority of cases, with mean pickup response times far exceeding 15 minutes under current fleet configurations.
+Hospital porter services are a critical component of clinical workflow, yet in many institutions dispatch remains a manual, radio-based process that routinely fails to meet operational targets. At Haven of Hope Hospital (HHH), porters are tasked with transporting patients, specimens, and equipment between 89 hospital departments. The stated Key Performance Indicator (KPI) requires a porter to arrive at the pickup location within 15 minutes of an order being placed. Analysis of 81,439 historical records from 2024 reveals that this target is violated in the majority of cases, with mean pickup response times far exceeding 15 minutes under current fleet configurations.
 
 This project presents a hybrid AI-driven dispatch system that integrates a Large Language Model (LLM) natural language interface with a Google OR-Tools Vehicle Routing Problem with Time Windows (VRPTW) solver. The LLM layer parses free-text dispatch requests in Chinese and English into structured task objects, enabling a conversational interface without rigid form-based input. The OR-Tools solver assigns tasks to porters using rolling-horizon re-optimisation, minimising response time subject to the 15-minute KPI. A Retrieval-Augmented Generation (RAG) policy advisor provides data-driven risk assessments and recommendations drawn from historical records.
 
@@ -128,7 +128,7 @@ Evaluation demonstrates that: (1) NLP parsing achieves 88--100\% accuracy across
 
 Hospital porters perform the physical movement of patients, medical specimens, equipment, and documents between departments. In large acute hospitals, this service operates continuously across shifts, with tasks ranging from routine specimen transport to time-critical patient transfers. Despite its operational importance, porter dispatch in many hospitals remains a manual, radio-based process reliant on dispatcher experience and incomplete real-time information. Klein and Thielen \cite{klein2025} confirm this in their systematic review of 73 papers on intra-hospital transport, noting that manual dispatch remains the dominant practice despite well-established algorithmic alternatives.
 
-HHH's stated Key Performance Indicator (KPI) requires a porter to arrive at the pickup location within 15 minutes of an order being placed. This response-time metric is operationally meaningful: it captures the component of the task that dispatch decisions directly control --- how quickly the right porter reaches the patient or specimen. Analysis of 2,843 historical records from 2024 reveals that this KPI is violated in the majority of recorded tasks under current operations, motivating the development of an automated, optimised dispatch system.
+HHH's stated Key Performance Indicator (KPI) requires a porter to arrive at the pickup location within 15 minutes of an order being placed. This response-time metric is operationally meaningful: it captures the component of the task that dispatch decisions directly control --- how quickly the right porter reaches the patient or specimen. Analysis of 81,439 historical records from 2024 reveals that this KPI is violated in the majority of recorded tasks under current operations, motivating the development of an automated, optimised dispatch system.
 
 From a broader perspective, healthcare logistics optimisation is a growing research area. Ton et al.\ \cite{ton2024} identify real-time intra-hospital transport management as an open challenge, noting that most existing systems use greedy assignment heuristics and lack the ability to consider fleet-wide state. Lee et al.\ \cite{lee2023} demonstrate that intelligent porter allocation can dramatically reduce delay rates in deployed hospital settings. Simultaneously, the emergence of Large Language Models (LLMs) capable of structured information extraction \cite{xu2024} enables natural language interfaces that eliminate rigid form-based entry in time-pressured environments.
 
@@ -278,7 +278,7 @@ Each dispatch event is modelled as a VRPTW instance. Let $P = \{p_1, \ldots, p_m
 The node graph comprises $m$ porter start depots, $n$ pickup nodes, $n$ delivery nodes, and one dummy end depot. Pickup-before-delivery precedence constraints are imposed for every task. The objective function is:
 
 \begin{equation}
-\min \sum_{(i,j) \in \text{routes}} c_{ij} + \lambda \sum_{k \in T} \max\!\bigl(0,\; \text{response}_k - W\bigr)
+\min \sum_{(i,j) \in \text{routes}} c_{ij} + \lambda \sum_{k \in T} \max\!\bigl (0,\; \text{response}_k - W\bigr)
 \label{eq:obj}
 \end{equation}
 
@@ -392,13 +392,13 @@ Location extraction achieved perfect accuracy (100\%), as the system prompt enum
 \end{tabular}
 \end{table}
 
-\textbf{Proposed fix:} Adding an explicit disambiguation rule to the system prompt --- ``If the request contains the word `Immediate' or `ji shi' without a `Super-Urgent' marker, classify priority as Urgent'' --- would close this gap. This is a one-line prompt change, not a model retraining requirement.
+\textbf{Proposed fix:} Adding an explicit disambiguation rule to the system prompt --- ``If the request contains the word `Immediate' or `Ji Shi' without a `Super-Urgent' marker, classify priority as Urgent'' --- would close this gap. This is a one-line prompt change, not a model retraining requirement.
 
 \textbf{Infection control flag errors (2 of 100):} Both errors were false negatives where the infection control information appeared in a non-standard position in the test sentence (appended as a parenthetical rather than at the end). The LLM correctly identifies infection keywords (VRE, NEATS, MRSA) when they appear in standard positions. The LLM-based approach inherently handles linguistic variation that a rule-based keyword matcher would miss.
 
 \subsection{Historical Performance Baseline}
 
-Analysis of 2,843 historical tasks from DATA2024.xlsx reveals the pre-intervention operational baseline:
+Analysis of 81,439 historical tasks from DATA2024.xlsx reveals the pre-intervention operational baseline:
 
 \begin{itemize}
   \item Mean task duration: \textbf{49.7 minutes}
