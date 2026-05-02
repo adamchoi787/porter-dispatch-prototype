@@ -46,9 +46,10 @@ INFECTION_KEYWORDS = ['VRE', 'NEATS', 'MRSA', 'MRDA', 'T.B.', 'TB', '接觸']
 
 def load_and_filter(xlsx_path: str, sample_size: int, seed: int = 42):
     """Load DATA2024.xlsx, filter to testable rows, return random sample."""
-    print(f"[Data] Loading {xlsx_path} (first 5000 rows)...")
-    df = pd.read_excel(xlsx_path, nrows=5000)
+    print(f"[Data] Loading {xlsx_path}...")
+    df = pd.read_excel(xlsx_path)
     df.columns = [c.strip() for c in df.columns]
+    df = df[df['狀態'] != '已傳真']
 
     # Keep only rows with all required fields populated
     required = ['從', '往', '服務', '優先']

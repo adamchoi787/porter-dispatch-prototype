@@ -23,7 +23,7 @@ class HistoricalTaskStore:
     Supports retrieval of similar tasks by service type, location, and time of day.
     """
 
-    def __init__(self, xlsx_path, max_rows=5000):
+    def __init__(self, xlsx_path, max_rows=None):
         self.tasks = []
         self._load(xlsx_path, max_rows)
 
@@ -36,6 +36,7 @@ class HistoricalTaskStore:
         try:
             df = pd.read_excel(xlsx_path, nrows=max_rows)
             df.columns = df.columns.str.strip()
+            df = df[df['狀態'] != '已傳真']
 
             required = ['下單', '從', '往', '服務']
             for col in required:

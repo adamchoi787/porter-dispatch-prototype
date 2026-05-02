@@ -25,7 +25,7 @@ try:
 
     # Initialize policy advisor with historical data
     data_path = os.path.join(os.path.dirname(__file__), '..', 'DATA2024.xlsx')
-    historical_store = HistoricalTaskStore(data_path, max_rows=3000)
+    historical_store = HistoricalTaskStore(data_path, max_rows=None)
     advisor = PolicyAdvisor(historical_store)
     print("--- Policy Advisor initialized ---")
 

@@ -14,6 +14,7 @@
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
 \usepackage{lmodern}
+\usepackage{CJKutf8}
 \usepackage{booktabs}
 \usepackage{array}
 \usepackage{amsmath}
@@ -135,9 +136,9 @@
   \node[font=\small\bfseries, color=white] at (2.5,3.5) {25\% meet KPI};
 
   %% Labels
-  \node[font=\scriptsize] at (2.5,-0.3) {2,843 historical tasks, 2024};
+  \node[font=\scriptsize] at (2.5,-0.3) {81,349 historical tasks, 2024};
   \node[font=\small\bfseries, color=alertred] at (2.5,-0.75)
-    {Mean duration: \textbf{49.7 min}};
+    {Mean duration: \textbf{46.3 min}};
 \end{tikzpicture}
 \end{columns}
 \end{frame}
@@ -166,14 +167,14 @@
   grid=major, grid style={gray!20},
 ]
 \addplot[fill=hkustblue!60] coordinates {
-  (43.5,{Specimen})
-  (68.9,{Patient Return})
-  (83.7,{NEATS})
-  (73.6,{Document})
-  (79.0,{X-ray})
-  (76.7,{Patient Transpt})
-  (94.4,{3F X-ray})
-  (95.4,{Admission})
+  (50.5,{Specimen})
+  (63.2,{Patient Return})
+  (86.6,{NEATS})
+  (71.1,{Document})
+  (80.1,{X-ray})
+  (80.6,{Patient Transpt})
+  (93.4,{3F X-ray})
+  (95.8,{Admission})
 };
 \end{axis}
 \end{tikzpicture}
@@ -181,7 +182,7 @@
 \column{0.44\textwidth}
 \vspace{-0.5cm}
 \begin{block}{Key insight}
-  High violation rates for admission (95.4\%) and 3F X-ray (94.4\%) reflect \textbf{long fixed travel distances} --- not dispatcher error.
+  High violation rates for admission (95.8\%) and 3F X-ray (93.4\%) reflect \textbf{long fixed travel distances} --- not dispatcher error.
 \end{block}
 
 \vspace{0.3cm}
@@ -308,7 +309,7 @@ Zero LLM parse failures across 100 samples.
 
 \vspace{0.3cm}
 \textbf{Priority: 88\%}\\
-{\small All 12 errors: ``Immediate'' (\textit{ji shi}) parsed as Normal instead of Urgent. Systematic, fixable with one prompt rule.}
+{\small All 12 errors: ``Immediate'' (\begin{CJK}{UTF8}{min}即時\end{CJK}) parsed as Normal instead of Urgent. Systematic, fixable with one prompt rule.}
 
 \vspace{0.3cm}
 \textbf{Location: 100\%}\\
@@ -434,7 +435,7 @@ Zero LLM parse failures across 100 samples.
 \end{exampleblock}
 
 \vspace{0.2cm}
-{\scriptsize\color{gray} 56.6\% of routes: full task $>$15 min regardless of algorithm (fixed by geography, not dispatch)}
+{\scriptsize\color{gray} 57.0\% of routes: full task $>$15 min regardless of algorithm (fixed by geography, not dispatch)}
 
 \end{columns}
 \end{frame}
@@ -494,7 +495,7 @@ Zero LLM parse failures across 100 samples.
   \draw[fill=alertred!20, draw=alertred!60, rounded corners=3pt] (0.2,3.5) rectangle (5.3,3.95);
   \node[font=\tiny\bfseries, color=alertred] at (2.75,3.72) {HIGH RISK — 3F X-ray task, 2 porters busy};
   \node[font=\tiny] at (2.75,3.15) {Historical mean for this route: 156.8 min};
-  \node[font=\tiny] at (2.75,2.75) {KPI violation rate: 94.4\%};
+  \node[font=\tiny] at (2.75,2.75) {KPI violation rate: 93.4\%};
   \node[font=\tiny, color=hkustblue] at (2.75,2.45) {Suggestion: pre-assign or flag for supervisor};
 
   %% Q&A
@@ -503,8 +504,8 @@ Zero LLM parse failures across 100 samples.
   \draw[fill=gray!20, rounded corners=2pt] (0.2,1.4) rectangle (5.3,1.85);
   \node[font=\tiny, color=gray] at (2.75,1.62) {``Which service type needs more porters?''};
   \draw[fill=hkustblue!10, rounded corners=2pt] (0.2,0.2) rectangle (5.3,1.3);
-  \node[font=\tiny] at (2.75,0.9) {Based on 2,843 records: 3F X-ray has};
-  \node[font=\tiny] at (2.75,0.65) {mean 156.8 min and 94.4\% KPI violation.};
+  \node[font=\tiny] at (2.75,0.9) {Based on 81,349 records: 3F X-ray has};
+  \node[font=\tiny] at (2.75,0.65) {mean 177.0 min and 93.4\% KPI violation.};
   \node[font=\tiny] at (2.75,0.4) {Consider dedicated porter or batching.};
 \end{tikzpicture}
 
@@ -539,7 +540,7 @@ Zero LLM parse failures across 100 samples.
 \vspace{0.3cm}
 \begin{block}{3. Operational Intelligence}
   \begin{itemize}
-    \item RAG policy advisor over 2,843 historical tasks
+    \item RAG policy advisor over 81,349 historical tasks
     \item KPI risk, fleet recommendations, free-text Q\&A
   \end{itemize}
 \end{block}
@@ -687,7 +688,7 @@ $\Rightarrow$ GUIDED\_LOCAL\_SEARCH
 
 \vspace{0.4cm}
 {\small Synthetic mode $\cdot$ 100 tasks $\cdot$ 8-min mean inter-arrival (historically realistic)}\\[0.2cm]
-{\small 56.6\% of all routes have direct travel + service time $>$15 min --- KPI blocks are geographic for these tasks}
+{\small 57.0\% of all routes have direct travel + service time $>$15 min --- KPI blocks are geographic for these tasks}
 \end{frame}
 
 \begin{frame}{Backup: Full Simulation Data}

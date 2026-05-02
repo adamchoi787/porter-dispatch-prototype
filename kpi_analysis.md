@@ -4,15 +4,15 @@
 
 ## Geographic Lower Bound
 
-Of 4,999 historical tasks with known routes:
-- **2,828 (56.6%)** have direct travel + minimum service time > 15 min
+Of 81,348 historical tasks with known routes:
+- **46,404 (57.0%)** have direct travel + minimum service time > 15 min
 - These tasks **cannot** fully complete within 15 min regardless of fleet size.
 - However, the pickup sub-task (porter arriving at origin) **can** meet the KPI
   if a porter is available and nearby — this is what dispatch optimisation controls.
 
 ## Simulation Results: Mean Time-to-Pickup
 
-Synthetic mode · 100 tasks · mean inter-arrival 8 min (historically realistic)
+Synthetic mode · 200 tasks · mean inter-arrival 3 min
 
 | Porters | Strategy | Mean Pickup (min) | Pickup KPI Violation (%) | Improvement |
 |---------|----------|-------------------|--------------------------|-------------|

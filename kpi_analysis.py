@@ -40,8 +40,9 @@ def load_geography_stats(travel_matrix, xlsx_path):
     where even a porter already at the origin cannot finish within KPI.
     """
     try:
-        df = pd.read_excel(xlsx_path, nrows=5000)
+        df = pd.read_excel(xlsx_path)
         df.columns = df.columns.str.strip()
+        df = df[df['狀態'] != '已傳真']
         df = df.dropna(subset=['從', '往', '服務'])
         df['from'] = df['從'].astype(str).str.strip()
         df['to']   = df['往'].astype(str).str.strip()

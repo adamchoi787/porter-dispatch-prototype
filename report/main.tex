@@ -10,6 +10,7 @@
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
 \usepackage{lmodern}
+\usepackage{CJKutf8}
 \usepackage{graphicx}
 \usepackage{url}
 \usepackage{booktabs}
@@ -110,7 +111,7 @@ The team thanks Prof.\ Xiangtong QI for his guidance and feedback throughout bot
 \newpage
 \section*{Abstract}
 
-Hospital porter services are a critical component of clinical workflow, yet in many institutions dispatch remains a manual, radio-based process that routinely fails to meet operational targets. At Haven of Hope Hospital (HHH), porters are tasked with transporting patients, specimens, and equipment between 89 hospital departments. The stated Key Performance Indicator (KPI) requires a porter to arrive at the pickup location within 15 minutes of an order being placed. Analysis of 81,439 historical records from 2024 reveals that this target is violated in the majority of cases, with mean pickup response times far exceeding 15 minutes under current fleet configurations.
+Hospital porter services are a critical component of clinical workflow, yet in many institutions dispatch remains a manual, radio-based process that routinely fails to meet operational targets. At Haven of Hope Hospital (HHH), porters are tasked with transporting patients, specimens, and equipment between 89 hospital departments. The stated Key Performance Indicator (KPI) requires a porter to arrive at the pickup location within 15 minutes of an order being placed. Analysis of 81,349 historical records from 2024 reveals that this target is violated in the majority of cases, with mean pickup response times far exceeding 15 minutes under current fleet configurations.
 
 This project presents a hybrid AI-driven dispatch system that integrates a Large Language Model (LLM) natural language interface with a Google OR-Tools Vehicle Routing Problem with Time Windows (VRPTW) solver. The LLM layer parses free-text dispatch requests in Chinese and English into structured task objects, enabling a conversational interface without rigid form-based input. The OR-Tools solver assigns tasks to porters using rolling-horizon re-optimisation, minimising response time subject to the 15-minute KPI. A Retrieval-Augmented Generation (RAG) policy advisor provides data-driven risk assessments and recommendations drawn from historical records.
 
@@ -128,7 +129,7 @@ Evaluation demonstrates that: (1) NLP parsing achieves 88--100\% accuracy across
 
 Hospital porters perform the physical movement of patients, medical specimens, equipment, and documents between departments. In large acute hospitals, this service operates continuously across shifts, with tasks ranging from routine specimen transport to time-critical patient transfers. Despite its operational importance, porter dispatch in many hospitals remains a manual, radio-based process reliant on dispatcher experience and incomplete real-time information. Klein and Thielen \cite{klein2025} confirm this in their systematic review of 73 papers on intra-hospital transport, noting that manual dispatch remains the dominant practice despite well-established algorithmic alternatives.
 
-HHH's stated Key Performance Indicator (KPI) requires a porter to arrive at the pickup location within 15 minutes of an order being placed. This response-time metric is operationally meaningful: it captures the component of the task that dispatch decisions directly control --- how quickly the right porter reaches the patient or specimen. Analysis of 81,439 historical records from 2024 reveals that this KPI is violated in the majority of recorded tasks under current operations, motivating the development of an automated, optimised dispatch system.
+HHH's stated Key Performance Indicator (KPI) requires a porter to arrive at the pickup location within 15 minutes of an order being placed. This response-time metric is operationally meaningful: it captures the component of the task that dispatch decisions directly control --- how quickly the right porter reaches the patient or specimen. Analysis of 81,349 historical records from 2024 reveals that this KPI is violated in the majority of recorded tasks under current operations, motivating the development of an automated, optimised dispatch system.
 
 From a broader perspective, healthcare logistics optimisation is a growing research area. Ton et al.\ \cite{ton2024} identify real-time intra-hospital transport management as an open challenge, noting that most existing systems use greedy assignment heuristics and lack the ability to consider fleet-wide state. Lee et al.\ \cite{lee2023} demonstrate that intelligent porter allocation can dramatically reduce delay rates in deployed hospital settings. Simultaneously, the emergence of Large Language Models (LLMs) capable of structured information extraction \cite{xu2024} enables natural language interfaces that eliminate rigid form-based entry in time-pressured environments.
 
@@ -245,7 +246,7 @@ The system comprises four functional layers, as illustrated in Figure~\ref{fig:a
 \label{fig:architecture}
 \end{figure}
 
-\textbf{Layer 1 (NLI)}: Converts free-text dispatch requests into structured task JSON using a DeepSeek LLM. \textbf{Layer 2 (Solver)}: Assigns tasks to porters using OR-Tools VRPTW with rolling-horizon re-optimisation. \textbf{Layer 3 (Interface)}: Flask REST API and Vanilla JS frontend dashboard. \textbf{Policy Advisor}: RAG-based module answering operational Q\&A and assessing KPI risk.
+\textbf{Layer 1 (NLI)}: Converts free-text dispatch requests into structured task JSON using a DeepSeek LLM. \textbf{Layer 2 (Solver)}: Assigns tasks to porters using OR-Tools VRPTW with rolling-horizon re-optimisation. \textbf{Layer 3 (Interface)}: Flask REST API and Vanilla JS frontend dashboard. \textbf{Layer 4 (Policy Advisor)}: RAG-based module answering operational Q\&A and assessing KPI risk.
 
 \subsection{Layer 1: Natural Language Interface (NLI)}
 
@@ -290,6 +291,10 @@ The solver uses PARALLEL\_CHEAPEST\_INSERTION for first-solution construction (e
 
 On every new task arrival and every porter completion event, the solver is re-invoked with the current fleet state and all pending tasks. This rolling-horizon approach ensures assignments always reflect the most current information: a porter completing early unlocks re-assignment of queued tasks. When no available solvers are present (e.g., OR-Tools is not installed), the system falls back to a greedy heuristic that assigns each task to the porter minimising estimated pickup time.
 
+\subsubsection{Data Source}
+
+The \path{DATA2024.xlsx} dataset used throughout this work was assembled by merging twelve monthly task extracts supplied by HHH for the 2024 operating year. After concatenation, records with status \begin{CJK}{UTF8}{min}已傳真\end{CJK} (faxed but not subsequently dispatched through the porter system) were excluded, leaving 81,349 completed task records for analysis.
+
 \subsubsection{Travel Time Matrix Construction}
 
 Travel times between all 89 hospital departments were derived from historical \path{DATA2024.xlsx} records. For each origin--destination pair, the 75th-percentile (p75) travel time was computed from observed porter journeys, providing a conservative estimate that accounts for typical congestion without being skewed by extreme outliers. For pairs absent from the historical data, a three-level fallback applies: (1) same-floor pairs: 5 minutes; (2) inter-floor pairs: 8 minutes; (3) global p90 fallback: 27.5 minutes. The resulting 89$\times$89 matrix is loaded at system startup and used for all routing and duration computations.
@@ -307,7 +312,7 @@ The Flask-based web API exposes 9 REST endpoints (see Appendix A). The single-pa
 
 After each OR-Tools assignment, the system makes a secondary LLM call to generate a human-readable explanation of why that porter was chosen (e.g., ``P-003 is selected because she is currently at A\&D, 2.1 minutes from the pickup, and has the shortest estimated total time of 8.4 minutes''). This explanation is displayed to the dispatcher as a ``Why this porter?'' panel.
 
-\subsection{Policy Advisor: RAG Design}
+\subsection{Layer 4: Policy Advisor (RAG Design)}
 
 The policy advisor uses Retrieval-Augmented Generation \cite{lewis2020} to ground its outputs in HHH's actual operational history. Its architecture has three components:
 
@@ -336,7 +341,7 @@ The system supports future-scheduled dispatch. When the LLM parses a \texttt{sch
 
 A discrete-event simulation benchmarks OR-Tools against the greedy baseline without requiring real-world deployment. The simulation models porter dispatch as an event queue: task arrivals and porter completions trigger re-assignment calls to either the greedy or OR-Tools solver.
 
-\textbf{Replay mode:} 100 tasks from DATA2024.xlsx are replayed in chronological order, preserving real inter-arrival times. This tests the solver under the actual task distribution and volumes observed at HHH.
+\textbf{Replay mode:} 100 tasks from DATA2024.xlsx are replayed in chronological order, preserving real inter-arrival times. This tests the solver under the actual task distribution and volumes observed at HHH. The 100-task slice was chosen to approximate a single peak-shift workload while keeping each simulation run computationally tractable; extending the replay to a full-day or full-week horizon is straightforward future work.
 
 \textbf{Synthetic mode:} Poisson inter-arrivals (mean 8 minutes per task, matching HHH's estimated operational rate of approximately 10 tasks per hour per shift) with service-type distribution approximating historical data. This tests the solver under controlled, repeatable conditions and allows fleet-size scaling experiments.
 
@@ -373,7 +378,7 @@ Location extraction achieved perfect accuracy (100\%), as the system prompt enum
 
 \subsection{NLP Error Analysis}
 
-\textbf{Priority extraction errors (12 of 100):} All 12 errors follow the same pattern: the ground-truth label is ``Urgent'' (corresponding to the Chinese term \textit{ji shi}, meaning ``immediate'') but the LLM returned ``Normal''. No errors occurred in the ``Super-Urgent'' category. The root cause is semantic ambiguity: in the reconstructed test sentences, Urgent tasks are represented by the term ``Immediate'' in the NL sentence, which does not carry an explicit superlative marker. The LLM interprets ``Immediate X-ray from 4D to Radiology'' as a normal-priority request because the urgency modifier is conveyed by word choice rather than an explicit flag. Table~\ref{tab:nlp_errors} shows representative error cases.
+\textbf{Priority extraction errors (12 of 100):} All 12 errors follow the same pattern: the ground-truth label is ``Urgent'' (corresponding to the Chinese term \begin{CJK}{UTF8}{min}即時\end{CJK}, meaning ``immediate'') but the LLM returned ``Normal''. No errors occurred in the ``Super-Urgent'' category. The root cause is semantic ambiguity: in the reconstructed test sentences, Urgent tasks are represented by the term ``Immediate'' in the NL sentence, which does not carry an explicit superlative marker. The LLM interprets ``Immediate X-ray from 4D to Radiology'' as a normal-priority request because the urgency modifier is conveyed by word choice rather than an explicit flag. Table~\ref{tab:nlp_errors} shows representative error cases.
 
 \begin{table}[H]
 \centering
@@ -392,43 +397,43 @@ Location extraction achieved perfect accuracy (100\%), as the system prompt enum
 \end{tabular}
 \end{table}
 
-\textbf{Proposed fix:} Adding an explicit disambiguation rule to the system prompt --- ``If the request contains the word `Immediate' or `Ji Shi' without a `Super-Urgent' marker, classify priority as Urgent'' --- would close this gap. This is a one-line prompt change, not a model retraining requirement.
+\textbf{Proposed fix:} Adding an explicit disambiguation rule to the system prompt --- ``If the request contains the word `Immediate' or `\begin{CJK}{UTF8}{min}即時\end{CJK}' without a `Super-Urgent' marker, classify priority as Urgent'' --- would close this gap. This is a one-line prompt change, not a model retraining requirement.
 
 \textbf{Infection control flag errors (2 of 100):} Both errors were false negatives where the infection control information appeared in a non-standard position in the test sentence (appended as a parenthetical rather than at the end). The LLM correctly identifies infection keywords (VRE, NEATS, MRSA) when they appear in standard positions. The LLM-based approach inherently handles linguistic variation that a rule-based keyword matcher would miss.
 
 \subsection{Historical Performance Baseline}
 
-Analysis of 81,439 historical tasks from DATA2024.xlsx reveals the pre-intervention operational baseline:
+Analysis of 81,349 historical tasks from DATA2024.xlsx reveals the pre-intervention operational baseline:
 
 \begin{itemize}
-  \item Mean task duration: \textbf{49.7 minutes}
+  \item Mean task duration: \textbf{46.3 minutes}
   \item Median task duration: \textbf{24.2 minutes}
-  \item KPI violation rate (15-min pickup threshold): \textbf{75.0\%}
+  \item KPI violation rate (15-min pickup threshold): \textbf{75.7\%}
 \end{itemize}
 
-The mean-median gap (49.7 vs 24.2 min) indicates a right-skewed distribution driven by high-duration service types. Table~\ref{tab:by_service} summarises the major service types by KPI performance.
+The mean-median gap (46.3 vs 24.2 min) indicates a right-skewed distribution driven by high-duration service types. Table~\ref{tab:by_service} summarises the major service types by KPI performance.
 
 \begin{table}[H]
 \centering
-\caption{Historical KPI violation rate by major service type (n\,=\,2,843).}
+\caption{Historical KPI violation rate by major service type (n\,=\,80{,}077).}
 \label{tab:by_service}
 \begin{tabular}{lccc}
 \toprule
 \textbf{Service Type} & \textbf{Count} & \textbf{Mean Duration (min)} & \textbf{KPI Violation (\%)} \\
 \midrule
-Patient Return          & 527  & 22.9  & 68.9\% \\
-Document Delivery       & 352  & 63.3  & 73.6\% \\
-X-ray Transport         & 333  & 74.9  & 79.0\% \\
-Admission               & 327  & 29.5  & 95.4\% \\
-Specimen Transport      & 292  & 15.5  & 43.5\% \\
-NEATS Patient           & 257  & 23.9  & 83.7\% \\
-3F X-ray                & 180  & 156.8 & 94.4\% \\
-Patient Transport       & 116  & 42.9  & 76.7\% \\
+Patient Return          & 13{,}660  & 20.6  & 63.2\% \\
+Document Delivery       & 10{,}059  & 47.6  & 71.1\% \\
+X-ray Transport         &  8{,}398  & 54.3  & 80.1\% \\
+Admission               & 10{,}368  & 32.5  & 95.8\% \\
+Specimen Transport      &  6{,}452  & 17.9  & 50.5\% \\
+NEATS Patient           &  8{,}330  & 25.0  & 86.6\% \\
+3F X-ray                &  4{,}891  & 177.0 & 93.4\% \\
+Patient Transport       &  2{,}537  & 69.3  & 80.6\% \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Specimen transport is the only service type approaching KPI feasibility (43.5\% violation rate, mean 15.5 min), consistent with its typically short travel distances. The high violation rates for admissions (95.4\%) and 3F X-ray (94.4\%) reflect long fixed travel distances intrinsic to the hospital geography. Notably, \textbf{56.6\%} of all unique origin--destination routes in the dataset have a direct travel time plus minimum service time exceeding 15 minutes --- meaning no dispatch algorithm can achieve task \textit{completion} within 15 minutes for these routes. This distinguishes the total-duration KPI (physically unachievable for many tasks) from the pickup-response KPI (achievable with appropriate fleet sizing and routing).
+Specimen transport is the only service type approaching KPI feasibility (50.5\% violation rate, mean 17.9 min), consistent with its typically short travel distances. The high violation rates for admissions (95.8\%) and 3F X-ray (93.4\%) reflect long fixed travel distances intrinsic to the hospital geography. Notably, \textbf{57.0\%} of all unique origin--destination routes in the dataset have a direct travel time plus minimum service time exceeding 15 minutes --- meaning no dispatch algorithm can achieve task \textit{completion} within 15 minutes for these routes. This distinguishes the total-duration KPI (physically unachievable for many tasks) from the pickup-response KPI (achievable with appropriate fleet sizing and routing).
 
 \subsection{Simulation Results: Greedy vs.\ OR-Tools}
 
@@ -461,6 +466,8 @@ Synthetic & OR-Tools & 7 & 78.2  & 100.0\% \\
 \end{table}
 
 OR-Tools improvements are most pronounced in synthetic mode where the system operates below saturation. At 5 porters (synthetic), OR-Tools reduces mean total duration from 240.0 to 166.8 minutes --- a \textbf{30.5\% improvement}. At 7 porters (synthetic), the improvement is \textbf{16.9\%}. In replay mode, improvements are marginal (0.5--2\%) because the historical task set is queue-saturated: tasks arrive faster than porters can complete them, and routing optimisation cannot overcome the structural queue bottleneck.
+
+The divergence between these two regimes is deliberate rather than artifactual. The 100-task replay slice compresses real timestamps into a load profile that exceeds steady-state fleet capacity, stress-testing system behaviour at peak overload. Synthetic mode, by contrast, draws inter-arrivals from a Poisson process at the 8-minute mean that matches HHH's actual operational rate of approximately 10 tasks per hour per shift --- the regime in which a deployed system would spend the majority of its runtime. The 17--30\% improvements observed in synthetic mode therefore represent the practically realisable gains under normal operations, while the replay results characterise robustness under peak congestion. Both regimes are operationally relevant: synthetic mode informs day-to-day deployment decisions, and replay mode bounds worst-case performance.
 
 \subsection{Pickup-Time KPI Analysis}
 
@@ -555,7 +562,7 @@ Three findings are notable:
 
   \item \textbf{At 10 porters, OR-Tools and greedy converge.} When supply is sufficient relative to demand, the marginal benefit of global optimisation diminishes because most assignments are already near-optimal greedy choices (any available porter is within a short travel distance of any origin).
 
-  \item \textbf{The 15-minute KPI is achievable with appropriate fleet sizing.} At 15 porters, the mean pickup time is \textbf{15.9 minutes} --- essentially at the KPI target. This demonstrates that the 15-minute response KPI is physically achievable, unlike the total-duration KPI (which is blocked by geography for 56.6\% of routes). The implication for HHH management is that fleet expansion to 15+ porters, combined with OR-Tools dispatch, would bring mean response times into KPI compliance.
+  \item \textbf{The 15-minute KPI is achievable with appropriate fleet sizing.} At 15 porters, the mean pickup time is \textbf{15.9 minutes} --- essentially at the KPI target. This demonstrates that the 15-minute response KPI is physically achievable, unlike the total-duration KPI (which is blocked by geography for 57.0\% of routes). The implication for HHH management is that fleet expansion to 15+ porters, combined with OR-Tools dispatch, would bring mean response times into KPI compliance.
 \end{enumerate}
 
 \subsection{Fleet Scaling and KPI Feasibility}
@@ -583,7 +590,7 @@ This project makes four concrete, validated contributions:
 
   \item \textbf{Optimised assignment with quantified gains:} An OR-Tools VRPTW solver demonstrating up to 35.8\% reduction in pickup response time and 30.5\% reduction in mean total task duration over greedy assignment under moderate utilisation. Gains are largest when the fleet is below saturation --- the regime most relevant to effective dispatch optimisation.
 
-  \item \textbf{Operational intelligence via RAG:} A policy advisor grounding LLM-generated recommendations in 2,843 historical task records, providing KPI risk assessments, data-driven fleet suggestions, and free-text Q\&A without bespoke model training.
+  \item \textbf{Operational intelligence via RAG:} A policy advisor grounding LLM-generated recommendations in 81,349 historical task records, providing KPI risk assessments, data-driven fleet suggestions, and free-text Q\&A without bespoke model training.
 
   \item \textbf{Fleet-sizing quantification:} A simulation-based finding that the 15-minute response KPI is achievable (mean pickup 15.9 min) with a fleet of 15 porters under OR-Tools dispatch at historical arrival rates. This provides a concrete, actionable recommendation to HHH management that was not previously available.
 \end{enumerate}
@@ -634,7 +641,7 @@ Ton et al.'s 12--18\% total duration reduction is comparable to our replay-mode 
 \section{Conclusion}
 %% ============================================================
 
-This project has delivered a hybrid AI-driven porter dispatch system integrating LLM natural language parsing with OR-Tools VRPTW optimisation, validated on 2,843 historical HHH task records. The NLI layer achieves 88--100\% parsing accuracy across five key dispatch fields, with all priority errors attributable to a correctable prompt ambiguity. The OR-Tools solver reduces mean task duration by up to 30\% in total, and reduces pickup response time by up to 35.8\%, over greedy assignment under moderate fleet utilisation.
+This project has delivered a hybrid AI-driven porter dispatch system integrating LLM natural language parsing with OR-Tools VRPTW optimisation, validated on 81,349 historical HHH task records. The NLI layer achieves 88--100\% parsing accuracy across five key dispatch fields, with all priority errors attributable to a correctable prompt ambiguity. The OR-Tools solver reduces mean task duration by up to 30\% in total, and reduces pickup response time by up to 35.8\%, over greedy assignment under moderate fleet utilisation.
 
 A key finding that reframes the KPI question: the 15-minute KPI applies to \textit{pickup response} (time to porter arrival), not total task duration. Simulation demonstrates that this KPI is physically achievable --- mean pickup time reaches 15.9 minutes with 15 porters under OR-Tools dispatch at current HHH task volumes. This provides a concrete fleet-sizing recommendation: expanding from the current fleet to 15+ dispatched porters, using OR-Tools optimised routing, would bring mean response times into KPI compliance.
 

@@ -111,6 +111,7 @@ def load_historical_tasks(xlsx_path, max_tasks=500):
     """
     df = pd.read_excel(xlsx_path, nrows=max_tasks * 2)  # read extra in case of filtering
     df.columns = df.columns.str.strip()
+    df = df[df['狀態'] != '已傳真']
 
     # Filter to rows with valid origin, destination, service, and timestamp
     required = ['下單', '從', '往', '服務']
