@@ -13,3 +13,16 @@ env/
 
 # --- IDE Settings (Optional) ---
 .vscode/.env
+
+# LaTeX build artefacts
+*.aux
+*.log
+*.toc
+*.out
+*.nav
+*.snm
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+*.bbl
+*.blg
