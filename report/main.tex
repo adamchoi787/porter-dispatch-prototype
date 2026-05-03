@@ -74,7 +74,7 @@
                         & KIM, Youseung \\[0.4cm]
 \textbf{Course:}        & IEDA 4901/4902 --- Final Year Project \\[0.4cm]
 \textbf{Academic Year:} & 2025--2026 \\[0.4cm]
-\textbf{Submitted:}     & 3 May 2026 \\
+\textbf{Submitted:}     & 6 May 2026 \\
 \end{tabular}
 
 \vfill
@@ -111,7 +111,7 @@ The team thanks Prof.\ Xiangtong QI for his guidance and feedback throughout bot
 \newpage
 \section*{Abstract}
 
-Hospital porter services are a critical component of clinical workflow, yet in many institutions dispatch remains a manual, radio-based process that routinely fails to meet operational targets. At Haven of Hope Hospital (HHH), porters are tasked with transporting patients, specimens, and equipment between 89 hospital departments. The stated Key Performance Indicator (KPI) requires a porter to arrive at the pickup location within 15 minutes of an order being placed. Analysis of 81,349 historical records from 2024 reveals that this target is violated in the majority of cases, with mean pickup response times far exceeding 15 minutes under current fleet configurations.
+Hospital porter services are a critical component of clinical workflow, yet in many institutions dispatch remains a manual, radio-based process that routinely fails to meet operational targets. At Haven of Hope Hospital (HHH), porters are tasked with transporting patients, specimens, and equipment between 89 hospital departments. The stated Key Performance Indicator (KPI) requires a porter to arrive at the pickup location within 15 minutes of an order being placed. Analysis of 81,349 historical records from 2024 reveals that this target is violated in 41.3\% of recorded tasks, with the mean pickup response time of 35.6 minutes substantially exceeding the 15-minute target due to a long tail of delayed pickups.
 
 This project presents a hybrid AI-driven dispatch system that integrates a Large Language Model (LLM) natural language interface with a Google OR-Tools Vehicle Routing Problem with Time Windows (VRPTW) solver. The LLM layer parses free-text dispatch requests in Chinese and English into structured task objects, enabling a conversational interface without rigid form-based input. The OR-Tools solver assigns tasks to porters using rolling-horizon re-optimisation, minimising response time subject to the 15-minute KPI. A Retrieval-Augmented Generation (RAG) policy advisor provides data-driven risk assessments and recommendations drawn from historical records.
 
@@ -129,7 +129,7 @@ Evaluation demonstrates that: (1) NLP parsing achieves 88--100\% accuracy across
 
 Hospital porters perform the physical movement of patients, medical specimens, equipment, and documents between departments. In large acute hospitals, this service operates continuously across shifts, with tasks ranging from routine specimen transport to time-critical patient transfers. Despite its operational importance, porter dispatch in many hospitals remains a manual, radio-based process reliant on dispatcher experience and incomplete real-time information. Klein and Thielen \cite{klein2025} confirm this in their systematic review of 73 papers on intra-hospital transport, noting that manual dispatch remains the dominant practice despite well-established algorithmic alternatives.
 
-HHH's stated Key Performance Indicator (KPI) requires a porter to arrive at the pickup location within 15 minutes of an order being placed. This response-time metric is operationally meaningful: it captures the component of the task that dispatch decisions directly control --- how quickly the right porter reaches the patient or specimen. Analysis of 81,349 historical records from 2024 reveals that this KPI is violated in the majority of recorded tasks under current operations, motivating the development of an automated, optimised dispatch system.
+HHH's stated Key Performance Indicator (KPI) requires a porter to arrive at the pickup location within 15 minutes of an order being placed. This response-time metric is operationally meaningful: it captures the component of the task that dispatch decisions directly control --- how quickly the right porter reaches the patient or specimen. Analysis of 81,349 historical records from 2024 reveals a 41.3\% pickup-KPI violation rate under current operations, with a long-tailed pickup-time distribution (median 12.0 min, mean 35.6 min). This pattern --- where the median task already meets the target but tail latency drags the mean far above it --- motivates an automated, optimised dispatch system focused on tail compression.
 
 From a broader perspective, healthcare logistics optimisation is a growing research area. Ton et al.\ \cite{ton2024} identify real-time intra-hospital transport management as an open challenge, noting that most existing systems use greedy assignment heuristics and lack the ability to consider fleet-wide state. Lee et al.\ \cite{lee2023} demonstrate that intelligent porter allocation can dramatically reduce delay rates in deployed hospital settings. Simultaneously, the emergence of Large Language Models (LLMs) capable of structured information extraction \cite{xu2024} enables natural language interfaces that eliminate rigid form-based entry in time-pressured environments.
 
@@ -403,37 +403,39 @@ Location extraction achieved perfect accuracy (100\%), as the system prompt enum
 
 \subsection{Historical Performance Baseline}
 
-From the 81,349 historical tasks in DATA2024.xlsx, 80,077 valid tasks remain after removing erroneous records. Analysis of this cleaned dataset reveals the pre‑intervention operational baseline:
+Analysis of the historical task records from DATA2024.xlsx reveals the pre-intervention operational baseline. Of the 81,349 cleaned records, 1,271 were excluded from duration statistics because their elapsed times exceeded 24 hours --- a pattern indicating delayed completion timestamps (porters marking tasks complete in a later shift) rather than genuine multi-day journeys. The reported statistics are therefore based on $n = 80{,}078$ records with both \begin{CJK}{UTF8}{min}下單\end{CJK} (order) and \begin{CJK}{UTF8}{min}報到\end{CJK} (porter arrival) timestamps and a plausible duration.
+
+Two complementary metrics are reported. \textit{Pickup time} (\begin{CJK}{UTF8}{min}報到\end{CJK} $-$ \begin{CJK}{UTF8}{min}下單\end{CJK}) is the order-to-arrival interval that the 15-minute KPI directly targets. \textit{Total duration} (\begin{CJK}{UTF8}{min}完成\end{CJK} $-$ \begin{CJK}{UTF8}{min}下單\end{CJK}) additionally includes service time at origin and travel to destination, which dispatch decisions cannot influence.
 
 \begin{itemize}
-  \item Mean task duration: \textbf{46.3 minutes}
-  \item Median task duration: \textbf{24.2 minutes}
-  \item KPI violation rate (15-min pickup threshold): \textbf{75.7\%}
+  \item Mean pickup time: \textbf{35.6 minutes}; median pickup time: \textbf{12.0 minutes}
+  \item Pickup-KPI violation rate ($>15$ min): \textbf{41.3\%}
+  \item Mean total task duration: \textbf{46.3 minutes}; median: \textbf{24.2 minutes}
 \end{itemize}
 
-The mean-median gap (46.3 vs 24.2 min) indicates a right-skewed distribution driven by high-duration service types. Table~\ref{tab:by_service} summarises the major service types by KPI performance.
+The 35.6 min mean against a 12.0 min median signals a right-skewed pickup distribution: the median task is already inside the KPI, but a long tail of delayed pickups pushes the mean far above target. This is the regime in which dispatch optimisation is most impactful --- compressing the tail rather than improving the median. Table~\ref{tab:by_service} summarises the major service types.
 
 \begin{table}[H]
 \centering
-\caption{Historical KPI violation rate by major service type (n\,=\,80{,}077).}
+\caption{Historical pickup-KPI performance by major service type (n\,=\,80{,}078). Pickup Violation reports the proportion of tasks where porter arrival exceeded 15 minutes; Mean Total Duration is shown for context but is not the KPI metric.}
 \label{tab:by_service}
 \begin{tabular}{lccc}
 \toprule
-\textbf{Service Type} & \textbf{Count} & \textbf{Mean Duration (min)} & \textbf{KPI Violation (\%)} \\
+\textbf{Service Type} & \textbf{Count} & \textbf{Mean Total Duration (min)} & \textbf{Pickup Violation (\%)} \\
 \midrule
-Patient Return          & 13{,}660  & 20.6  & 63.2\% \\
-Document Delivery       & 10{,}059  & 47.6  & 71.1\% \\
-X-ray Transport         &  8{,}398  & 54.3  & 80.1\% \\
-Admission               & 10{,}368  & 32.5  & 95.8\% \\
-Specimen Transport      &  6{,}452  & 17.9  & 50.5\% \\
-NEATS Patient           &  8{,}330  & 25.0  & 86.6\% \\
-3F X-ray                &  4{,}891  & 177.0 & 93.4\% \\
-Patient Transport       &  2{,}537  & 69.3  & 80.6\% \\
+Patient Return          & 13{,}660  & 20.6  & 35.1\% \\
+Document Delivery       & 10{,}059  & 47.6  & 40.0\% \\
+X-ray Transport         &  8{,}398  & 54.3  & 68.8\% \\
+Admission               & 10{,}368  & 32.5  & 25.3\% \\
+Specimen Transport      &  6{,}452  & 17.9  & 19.3\% \\
+NEATS Patient           &  8{,}330  & 25.0  & 35.8\% \\
+3F X-ray                &  4{,}891  & 177.0 & 88.2\% \\
+Patient Transport       &  2{,}537  & 69.3  & 44.8\% \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Specimen transport is the only service type approaching KPI feasibility (50.5\% violation rate, mean 17.9 min), consistent with its typically short travel distances. The high violation rates for admissions (95.8\%) and 3F X-ray (93.4\%) reflect long fixed travel distances intrinsic to the hospital geography. Notably, \textbf{57.0\%} of all unique origin--destination routes in the dataset have a direct travel time plus minimum service time exceeding 15 minutes --- meaning no dispatch algorithm can achieve task \textit{completion} within 15 minutes for these routes. This distinguishes the total-duration KPI (physically unachievable for many tasks) from the pickup-response KPI (achievable with appropriate fleet sizing and routing).
+The pickup-violation profile differs sharply from the total-duration profile. Specimen transport (19.3\% pickup violation) and admissions (25.3\%) already meet the pickup KPI for the majority of historical tasks, despite admissions in particular having a longer total duration (32.5 min) once travel-to-destination is included. By contrast, 3F X-ray (88.2\%) and X-ray Transport (68.8\%) struggle on pickup --- typically because the imaging suites are concentrated on specific floors, leaving few porters geographically close to the pickup origin. Notably, \textbf{57.0\%} of all unique origin--destination routes in the dataset have direct travel plus minimum service time exceeding 15 minutes, meaning no dispatch algorithm can achieve full task \textit{completion} within 15 minutes for these routes. This is precisely why the pickup-time KPI (which dispatch directly controls) and not the total-duration KPI (which is geographically bounded) is the appropriate optimisation target.
 
 \subsection{Simulation Results: Greedy vs.\ OR-Tools}
 
@@ -441,12 +443,12 @@ Table~\ref{tab:sim_results} presents simulation results across fleet sizes and s
 
 \begin{table}[H]
 \centering
-\caption{Simulation results: mean total task duration and KPI violation rate.}
+\caption{Simulation results: mean total task duration by strategy, mode, and fleet size. Total duration is reported for completeness; the pickup-time KPI metric is reported separately in Table~\ref{tab:pickup}.}
 \label{tab:sim_results}
 \vspace{4pt}
 \begin{tabular}{llcc}
 \toprule
-\textbf{Mode} & \textbf{Strategy} & \textbf{Porters} & \textbf{Mean Duration (min)} \\
+\textbf{Mode} & \textbf{Strategy} & \textbf{Porters} & \textbf{Mean Total Duration (min)} \\
 \midrule
 Replay & Greedy   & 3 & 293.5 \\
 Replay & OR-Tools & 3 & 286.6 \\

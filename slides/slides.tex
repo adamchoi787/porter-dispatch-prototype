@@ -147,7 +147,7 @@
 \begin{columns}
 \column{0.52\textwidth}
 
-\textbf{By service type (violation rate):}
+\textbf{By service type (pickup violation rate):}
 
 \vspace{0.2cm}
 \begin{tikzpicture}[scale=0.72]
@@ -155,10 +155,10 @@
   xbar,
   bar width=10pt,
   width=9cm, height=6.5cm,
-  xlabel={KPI Violation Rate (\%)},
+  xlabel={Pickup Violation Rate (\%)},
   xmin=0, xmax=105,
   symbolic y coords={
-    {Specimen},{Patient Return},{NEATS},{Document},{X-ray},{Patient Transpt},{3F X-ray},{Admission}},
+    {Specimen},{Admission},{Patient Return},{NEATS},{Document},{Patient Transpt},{X-ray},{3F X-ray}},
   ytick=data,
   y tick label style={font=\scriptsize},
   x tick label style={font=\scriptsize},
@@ -167,14 +167,14 @@
   grid=major, grid style={gray!20},
 ]
 \addplot[fill=hkustblue!60] coordinates {
-  (50.5,{Specimen})
-  (63.2,{Patient Return})
-  (86.6,{NEATS})
-  (71.1,{Document})
-  (80.1,{X-ray})
-  (80.6,{Patient Transpt})
-  (93.4,{3F X-ray})
-  (95.8,{Admission})
+  (19.3,{Specimen})
+  (25.3,{Admission})
+  (35.1,{Patient Return})
+  (35.8,{NEATS})
+  (40.0,{Document})
+  (44.8,{Patient Transpt})
+  (68.8,{X-ray})
+  (88.2,{3F X-ray})
 };
 \end{axis}
 \end{tikzpicture}
@@ -182,7 +182,7 @@
 \column{0.44\textwidth}
 \vspace{-0.5cm}
 \begin{block}{Key insight}
-  High violation rates for admission (95.8\%) and 3F X-ray (93.4\%) reflect \textbf{long fixed travel distances} --- not dispatcher error.
+  3F X-ray has the highest pickup violation rate (88.2\%) --- imaging suites concentrate on specific floors, leaving few porters geographically near the pickup origin.
 \end{block}
 
 \vspace{0.3cm}
@@ -495,7 +495,7 @@ Zero LLM parse failures across 100 samples.
   \draw[fill=alertred!20, draw=alertred!60, rounded corners=3pt] (0.2,3.5) rectangle (5.3,3.95);
   \node[font=\tiny\bfseries, color=alertred] at (2.75,3.72) {HIGH RISK — 3F X-ray task, 2 porters busy};
   \node[font=\tiny] at (2.75,3.15) {Historical mean for this route: 156.8 min};
-  \node[font=\tiny] at (2.75,2.75) {KPI violation rate: 93.4\%};
+  \node[font=\tiny] at (2.75,2.75) {Pickup violation rate: 88.2\%};
   \node[font=\tiny, color=hkustblue] at (2.75,2.45) {Suggestion: pre-assign or flag for supervisor};
 
   %% Q&A
@@ -505,7 +505,7 @@ Zero LLM parse failures across 100 samples.
   \node[font=\tiny, color=gray] at (2.75,1.62) {``Which service type needs more porters?''};
   \draw[fill=hkustblue!10, rounded corners=2pt] (0.2,0.2) rectangle (5.3,1.3);
   \node[font=\tiny] at (2.75,0.9) {Based on 81,349 records: 3F X-ray has};
-  \node[font=\tiny] at (2.75,0.65) {mean 177.0 min and 93.4\% KPI violation.};
+  \node[font=\tiny] at (2.75,0.65) {mean 177.0 min and 88.2\% pickup violation.};
   \node[font=\tiny] at (2.75,0.4) {Consider dedicated porter or batching.};
 \end{tikzpicture}
 
@@ -694,23 +694,23 @@ $\Rightarrow$ GUIDED\_LOCAL\_SEARCH
 \begin{frame}{Backup: Full Simulation Data}
 \centering
 \footnotesize
-\begin{tabular}{llccc}
+\begin{tabular}{llcc}
 \toprule
-\textbf{Mode} & \textbf{Strategy} & \textbf{Porters} & \textbf{Mean (min)} & \textbf{KPI Viol.\ (\%)} \\
+\textbf{Mode} & \textbf{Strategy} & \textbf{Porters} & \textbf{Mean Total Duration (min)} \\
 \midrule
-Replay    & Greedy   & 3 & 293.5 & 99.0\% \\
-Replay    & OR-Tools & 3 & 286.6 & 99.0\% \\
-Replay    & Greedy   & 5 & 158.6 & 97.0\% \\
-Replay    & OR-Tools & 5 & 155.1 & 96.8\% \\
-Replay    & Greedy   & 7 & 104.4 & 96.0\% \\
-Replay    & OR-Tools & 7 & 103.4 & 95.8\% \\
+Replay    & Greedy   & 3 & 293.5 \\
+Replay    & OR-Tools & 3 & 286.6 \\
+Replay    & Greedy   & 5 & 158.6 \\
+Replay    & OR-Tools & 5 & 155.1 \\
+Replay    & Greedy   & 7 & 104.4 \\
+Replay    & OR-Tools & 7 & 103.4 \\
 \midrule
-Synthetic & Greedy   & 3 & 627.4 & 100.0\% \\
-Synthetic & OR-Tools & 3 & 563.2 & 100.0\% \\
-Synthetic & Greedy   & 5 & 240.0 & 100.0\% \\
-Synthetic & OR-Tools & 5 & 166.8 & 100.0\% \\
-Synthetic & Greedy   & 7 & 94.1  & 100.0\% \\
-Synthetic & OR-Tools & 7 & 78.2  & 100.0\% \\
+Synthetic & Greedy   & 3 & 627.4 \\
+Synthetic & OR-Tools & 3 & 563.2 \\
+Synthetic & Greedy   & 5 & 240.0 \\
+Synthetic & OR-Tools & 5 & 166.8 \\
+Synthetic & Greedy   & 7 & 94.1  \\
+Synthetic & OR-Tools & 7 & 78.2  \\
 \bottomrule
 \end{tabular}
 \end{frame}
