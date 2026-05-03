@@ -98,7 +98,7 @@ This report documents the design, implementation, and evaluation of an AI-driven
 \midrule
 CHAN, Hok Nam    & Travel time matrix,  discrete-event simulation harness, data analysis, NLI layer& 45\%& 50\%\\[4pt]
 CHOI, Cheuk Man & LLM integration, Flask web API, frontend dashboard, OR-Tools solver design, policy advisor(RAG)& 45\%& 50\%\\[4pt]
-KIM, Youseung   & Communicaiton with external parties& 10\%& 0\%\\
+KIM, Youseung   & Communication with external parties& 10\%& 0\%\\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -617,7 +617,10 @@ Invalid origin location &
 Travel-matrix validator rejects \texttt{FloorZ}; the dispatcher receives a structured error message naming the unknown location and listing the 89 valid options. \\[4pt]
 Solver failure / fallback &
 (OR-Tools unavailable at runtime) &
-System falls back to the greedy heuristic; the assignment still completes, with a notice to the dispatcher that optimisation is degraded. \\
+System falls back to the greedy heuristic; the assignment still completes, with a notice to the dispatcher that optimisation is degraded. \\[4pt]
+Multi-stop route &
+``Send a patient from 7H to 3FXRAY, then continue to ICU'' &
+NLI extracts \texttt{from=7H}, \texttt{stops=["3FXRAY"]}, \texttt{to=ICU}; the solver routes the porter through the intermediate stop before the final destination, maintaining the pickup-KPI constraint at each leg. \\
 \bottomrule
 \end{tabular}
 \end{table}
