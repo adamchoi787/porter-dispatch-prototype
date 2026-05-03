@@ -216,13 +216,13 @@ The system comprises four functional layers, as illustrated in Figure~\ref{fig:a
   lbl/.style={font=\scriptsize, text=gray!70, inner sep=1pt}
 ]
 % Top row: wide horizontal spacing so arrow gaps are long enough for two-line labels
-\node[box=blue]            (nlp)    at (0,0)     {NLI Layer\\[1pt]\footnotesize DeepSeek LLM};
-\node[box=green!60!black]  (solver) at (6.0,0)   {Solver Layer\\[1pt]\footnotesize OR-Tools VRPTW};
-\node[box=orange]          (ui)     at (12.0,0)  {Interface Layer\\[1pt]\footnotesize Flask + JS};
+\node[box=blue]            (nlp)    at (0,0)     {Layer 1: NLI\\[1pt]\footnotesize DeepSeek LLM};
+\node[box=green!60!black]  (solver) at (6.0,0)   {Layer 2: Solver\\[1pt]\footnotesize OR-Tools VRPTW};
+\node[box=orange]          (ui)     at (12.0,0)  {Layer 3: Interface\\[1pt]\footnotesize Flask + JS};
 
 % Bottom row with extra vertical clearance
 \node[box=gray]            (data)   at (6.0,-3.0)  {Data Layer\\[1pt]\footnotesize 89$\times$89 Matrix};
-\node[box=violet]          (adv)    at (12.0,-3.0) {Policy Advisor\\[1pt]\footnotesize RAG + LLM};
+\node[box=violet]          (adv)    at (12.0,-3.0) {Layer 4: Policy Advisor\\[1pt]\footnotesize RAG + LLM};
 
 % Input / output labels above top row
 \node[lbl, above=0.55cm of nlp]  (in)  {\textit{NL request (ZH/EN)}};
@@ -242,11 +242,15 @@ The system comprises four functional layers, as illustrated in Figure~\ref{fig:a
 \draw[arr] (data) -- (adv);
 \draw[arr] (adv) -- (ui);
 \end{tikzpicture}
-\caption{Four-layer hybrid AI dispatch system architecture. Input flows left-to-right from NL request through NLI, Solver, and Interface layers; the Data Layer feeds both the Solver and Policy Advisor.}
+\caption{Four-layer hybrid AI dispatch system architecture. Input flows left-to-right through the NLI (Layer 1), Solver (Layer 2), and Interface (Layer 3) layers; the Data Layer feeds both the Solver and the Policy Advisor (Layer 4).}
 \label{fig:architecture}
 \end{figure}
 
 \textbf{Layer 1 (NLI)}: Converts free-text dispatch requests into structured task JSON using a DeepSeek LLM. \textbf{Layer 2 (Solver)}: Assigns tasks to porters using OR-Tools VRPTW with rolling-horizon re-optimisation. \textbf{Layer 3 (Interface)}: Flask REST API and Vanilla JS frontend dashboard. \textbf{Layer 4 (Policy Advisor)}: RAG-based module answering operational Q\&A and assessing KPI risk.
+
+\subsection{Data Source}
+
+The \path{DATA2024.xlsx} dataset used throughout this work was assembled by merging twelve monthly task extracts supplied by HHH for the 2024 operating year. After concatenation, records with status \begin{CJK}{UTF8}{min}已傳真\end{CJK} (faxed but not subsequently dispatched through the porter system) were excluded, leaving 81,349 completed task records for analysis. This single dataset is the common substrate for three downstream uses: (i) calibrating the 89$\times$89 travel-time matrix consumed by the Solver (\S\ref{sec:travel}); (ii) populating the Policy Advisor's retrieval index; and (iii) providing the historical baseline against which the simulation results in \S\ref{sec:baseline} are measured.
 
 \subsection{Layer 1: Natural Language Interface (NLI)}
 
@@ -274,7 +278,9 @@ Parsed tasks are validated against the travel matrix before dispatch; invalid or
 
 \subsubsection{Problem Formulation}
 
-Each dispatch event is modelled as a VRPTW instance. Let $P = \{p_1, \ldots, p_m\}$ be the set of available porters and $T = \{t_1, \ldots, t_n\}$ be the pending tasks. Each task $t_k$ has origin $o_k$, destination $d_k$, and service time $s_k$. Porter $p_i$ is at known location $l_i$. The KPI soft time window is $[0, W]$ where $W = 15$ minutes.
+Each dispatch decision is formalised as a small instance of the Vehicle Routing Problem with Time Windows (VRPTW). Informally: given the porters available right now (each at a known location) and the tasks waiting to be served, the solver chooses an assignment that minimises total porter travel time while penalising any task whose pickup response exceeds 15 minutes. The formal notation follows.
+
+Let $P = \{p_1, \ldots, p_m\}$ be the set of available porters and $T = \{t_1, \ldots, t_n\}$ be the pending tasks. Each task $t_k$ has origin $o_k$, destination $d_k$, and service time $s_k$. The service time $s_k$ is a per-service-type constant calibrated from observed historical means (e.g., 5 min for specimen transport, 7 min for patient return, 10 min for patient transport), capturing the time a porter spends at the origin handling the task before departing for the destination. Porter $p_i$ is at known location $l_i$. The KPI soft time window is $[0, W]$ where $W = 15$ minutes.
 
 The node graph comprises $m$ porter start depots, $n$ pickup nodes, $n$ delivery nodes, and one dummy end depot. Pickup-before-delivery precedence constraints are imposed for every task. The objective function is:
 
@@ -291,11 +297,8 @@ The solver uses PARALLEL\_CHEAPEST\_INSERTION for first-solution construction (e
 
 On every new task arrival and every porter completion event, the solver is re-invoked with the current fleet state and all pending tasks. This rolling-horizon approach ensures assignments always reflect the most current information: a porter completing early unlocks re-assignment of queued tasks. When no available solvers are present (e.g., OR-Tools is not installed), the system falls back to a greedy heuristic that assigns each task to the porter minimising estimated pickup time.
 
-\subsubsection{Data Source}
-
-The \path{DATA2024.xlsx} dataset used throughout this work was assembled by merging twelve monthly task extracts supplied by HHH for the 2024 operating year. After concatenation, records with status \begin{CJK}{UTF8}{min}已傳真\end{CJK} (faxed but not subsequently dispatched through the porter system) were excluded, leaving 81,349 completed task records for analysis.
-
 \subsubsection{Travel Time Matrix Construction}
+\label{sec:travel}
 
 Travel times between all 89 hospital departments were derived from historical \path{DATA2024.xlsx} records. For each origin--destination pair, the 75th-percentile (p75) travel time was computed from observed porter journeys, providing a conservative estimate that accounts for typical congestion without being skewed by extreme outliers. For pairs absent from the historical data, a three-level fallback applies: (1) same-floor pairs: 5 minutes; (2) inter-floor pairs: 8 minutes; (3) global p90 fallback: 27.5 minutes. The resulting 89$\times$89 matrix is loaded at system startup and used for all routing and duration computations.
 
@@ -316,7 +319,7 @@ After each OR-Tools assignment, the system makes a secondary LLM call to generat
 
 The policy advisor uses Retrieval-Augmented Generation \cite{lewis2020} to ground its outputs in HHH's actual operational history. Its architecture has three components:
 
-\textbf{Knowledge base (HistoricalTaskStore):} The DATA2024.xlsx dataset is loaded into memory at startup. Each record represents one completed porter task with fields including service type, origin, destination, time of day, and total duration.
+\textbf{Knowledge base (HistoricalTaskStore):} The DATA2024.xlsx dataset is loaded into memory at startup, providing all 81,349 cleaned task records for retrieval. (The narrower 80,078-record baseline cohort reported in \S\ref{sec:baseline} excludes a further 1,271 rows whose elapsed times exceeded 24 hours; those rows have valid origin, destination, service, and arrival information and are retained here, since the duration anomaly affects only summary statistics and not the retrieval features.) Each record represents one completed porter task with fields including service type, origin, destination, time of day, and total duration.
 
 \textbf{Retrieval:} Given an incoming task or query, the system retrieves the $K=10$ most similar historical records using a weighted similarity score:
 \begin{equation}
@@ -345,7 +348,9 @@ A discrete-event simulation benchmarks OR-Tools against the greedy baseline with
 
 \textbf{Synthetic mode:} Poisson inter-arrivals (mean 8 minutes per task, matching HHH's estimated operational rate of approximately 10 tasks per hour per shift) with service-type distribution approximating historical data. This tests the solver under controlled, repeatable conditions and allows fleet-size scaling experiments.
 
-Three metrics are tracked: (1) \textbf{total task duration} (task arrival to delivery completion); (2) \textbf{time-to-pickup} (task arrival to porter arrival at origin --- the KPI-relevant metric); (3) \textbf{KPI violation rate} against both metrics.
+Three metrics are tracked: (1) \textbf{total task duration} (order placement to delivery completion); (2) \textbf{time-to-pickup} (order placement to porter arrival at origin --- the KPI-relevant metric); (3) \textbf{KPI violation rate} against both metrics.
+
+A simulation run is described as \emph{queue-saturated} when the task arrival rate exceeds the maximum task-completion rate of the available fleet, so the queue grows unboundedly over the run. In this regime, dispatch optimisation can only marginally affect outcomes because tasks wait primarily for porter availability, not for the assignment decision. This terminology recurs in \S\ref{sec:simresults} when interpreting why replay-mode improvements are smaller than synthetic-mode improvements.
 
 %% ============================================================
 \section{Results}
@@ -402,6 +407,7 @@ Location extraction achieved perfect accuracy (100\%), as the system prompt enum
 \textbf{Infection control flag errors (2 of 100):} Both errors were false negatives where the infection control information appeared in a non-standard position in the test sentence (appended as a parenthetical rather than at the end). The LLM correctly identifies infection keywords (VRE, NEATS, MRSA) when they appear in standard positions. The LLM-based approach inherently handles linguistic variation that a rule-based keyword matcher would miss.
 
 \subsection{Historical Performance Baseline}
+\label{sec:baseline}
 
 Analysis of the historical task records from DATA2024.xlsx reveals the pre-intervention operational baseline. Of the 81,349 cleaned records, 1,271 were excluded from duration statistics because their elapsed times exceeded 24 hours --- a pattern indicating delayed completion timestamps (porters marking tasks complete in a later shift) rather than genuine multi-day journeys. The reported statistics are therefore based on $n = 80{,}078$ records with both \begin{CJK}{UTF8}{min}下單\end{CJK} (order) and \begin{CJK}{UTF8}{min}報到\end{CJK} (porter arrival) timestamps and a plausible duration.
 
@@ -438,6 +444,7 @@ Patient Transport       &  2{,}537  & 69.3  & 44.8\% \\
 The pickup-violation profile differs sharply from the total-duration profile. Specimen transport (19.3\% pickup violation) and admissions (25.3\%) already meet the pickup KPI for the majority of historical tasks, despite admissions in particular having a longer total duration (32.5 min) once travel-to-destination is included. By contrast, 3F X-ray (88.2\%) and X-ray Transport (68.8\%) struggle on pickup --- typically because the imaging suites are concentrated on specific floors, leaving few porters geographically close to the pickup origin. Notably, \textbf{57.0\%} of all unique origin--destination routes in the dataset have direct travel plus minimum service time exceeding 15 minutes, meaning no dispatch algorithm can achieve full task \textit{completion} within 15 minutes for these routes. This is precisely why the pickup-time KPI (which dispatch directly controls) and not the total-duration KPI (which is geographically bounded) is the appropriate optimisation target.
 
 \subsection{Simulation Results: Greedy vs.\ OR-Tools}
+\label{sec:simresults}
 
 Table~\ref{tab:sim_results} presents simulation results across fleet sizes and scenarios. Replay mode uses 100 historical tasks; Synthetic mode uses 100 Poisson-arrival tasks at 8-minute mean inter-arrival.
 
@@ -472,6 +479,7 @@ OR-Tools improvements are most pronounced in synthetic mode where the system ope
 The divergence between these two regimes is deliberate rather than artifactual. The 100-task replay slice compresses real timestamps into a load profile that exceeds steady-state fleet capacity, stress-testing system behaviour at peak overload. Synthetic mode, by contrast, draws inter-arrivals from a Poisson process at the 8-minute mean that matches HHH's actual operational rate of approximately 10 tasks per hour per shift --- the regime in which a deployed system would spend the majority of its runtime. The 17--30\% improvements observed in synthetic mode therefore represent the practically realisable gains under normal operations, while the replay results characterise robustness under peak congestion. Both regimes are operationally relevant: synthetic mode informs day-to-day deployment decisions, and replay mode bounds worst-case performance.
 
 \subsection{Pickup-Time KPI Analysis}
+\label{sec:pickup}
 
 The 15-minute KPI measures \textit{response time}: the time from order placement to porter arrival at the pickup location. This is the metric that dispatch decisions directly control. Total task duration additionally includes the porter's service time at origin and travel to destination --- components that are geographically constrained and independent of the assignment algorithm.
 
@@ -560,7 +568,7 @@ Figure~\ref{fig:pickup} visualises the pickup-time results and makes the KPI thr
 Three findings are notable:
 
 \begin{enumerate}
-  \item \textbf{OR-Tools delivers substantial pickup-time reductions at lower fleet sizes.} At 5 porters, OR-Tools reduces mean pickup time from 204.5 to 131.3 minutes --- a \textbf{35.8\% improvement}. At 7 porters, the reduction is from 58.6 to 42.7 minutes (\textbf{27.2\%}). The improvement arises because OR-Tools selects the globally nearest available porter rather than the locally greedy choice, reducing average travel-to-origin.
+  \item \textbf{OR-Tools delivers substantial pickup-time reductions at lower fleet sizes.} At 5 porters, OR-Tools reduces mean pickup time from 204.5 to 131.3 minutes --- a \textbf{35.8\% improvement}. At 7 porters, the reduction is from 58.6 to 42.7 minutes (\textbf{27.1\%}). The improvement arises because OR-Tools selects the globally nearest available porter rather than the locally greedy choice, reducing average travel-to-origin.
 
   \item \textbf{At 10 porters, OR-Tools and greedy converge.} When supply is sufficient relative to demand, the marginal benefit of global optimisation diminishes because most assignments are already near-optimal greedy choices (any available porter is within a short travel distance of any origin).
 
@@ -578,6 +586,43 @@ The combined analysis reveals a clear fleet scaling picture:
 \end{itemize}
 
 The simulation thus provides both a performance benchmark and a fleet-sizing recommendation: to achieve the 15-minute response KPI, HHH would need approximately 15 porters per shift under current task volumes, dispatched with an optimised algorithm.
+
+\subsection{End-to-End Functional Validation}
+\label{sec:edgecases}
+
+In addition to the aggregate metrics reported above, the deployed prototype was exercised against a set of representative edge cases that span the system's defined operational scope. Each case was issued through the live web dashboard and the resulting behaviour observed end-to-end. Table~\ref{tab:edgecases} summarises the cases and the system's response.
+
+\begin{table}[H]
+\centering
+\caption{End-to-end functional validation across representative dispatch scenarios.}
+\label{tab:edgecases}
+\begin{tabular}{p{4.4cm}p{5.0cm}p{4.6cm}}
+\toprule
+\textbf{Scenario} & \textbf{Input (NL request)} & \textbf{Observed system behaviour} \\
+\midrule
+Multi-task utterance &
+``Send a patient from 7H to A\&D and a specimen from 5L to Lab'' &
+NLI returns two structured tasks; solver assigns them concurrently to two porters in a single dispatch call. \\[4pt]
+Future-scheduled task &
+``Send a patient from 7H to A\&D at 14:30'' &
+NLI extracts \texttt{scheduled\_at}; task placed on \texttt{scheduled\_queue}; daemon thread releases it at 14:30; UI shows live countdown. \\[4pt]
+Infection control flag &
+``NEATS patient from 3C to A\&D, VRE positive'' &
+NLI populates \texttt{infection\_control}; assignment card surfaces a red infection warning to the dispatcher. \\[4pt]
+Mixed Chinese / English input &
+``\begin{CJK}{UTF8}{min}緊急\end{CJK} patient from 3FXRAY to 6H'' &
+NLI parses the Chinese urgency token and the English route; priority correctly classified as Urgent. \\[4pt]
+Invalid origin location &
+``Send a patient from FloorZ to A\&D'' &
+Travel-matrix validator rejects \texttt{FloorZ}; the dispatcher receives a structured error message naming the unknown location and listing the 89 valid options. \\[4pt]
+Solver failure / fallback &
+(OR-Tools unavailable at runtime) &
+System falls back to the greedy heuristic; the assignment still completes, with a notice to the dispatcher that optimisation is degraded. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+These scenarios cover every public dispatch path documented in Appendix~A (\texttt{/dispatch}, \texttt{/scheduled}, \texttt{/advisor/*}) as well as the two principal failure modes (invalid input, solver unavailability). The system handled each case correctly without manual intervention. Combined with the simulation results (\S\ref{sec:simresults}--\S\ref{sec:pickup}), this functional sweep establishes that the prototype works for the most common real cases within its defined scope rather than only for the metric-aggregation regime.
 
 %% ============================================================
 \section{Discussion}
@@ -633,7 +678,7 @@ Ton et al.'s 12--18\% total duration reduction is comparable to our replay-mode 
 
 \subsection{Critical Evaluation of Design Choices}
 
-\textbf{LLM vs.\ trained classifier for NLI:} Choosing an LLM for NLI was pragmatic. No labelled training data existed at project start; the LLM with an enumerated schema achieved 84\% all-field accuracy without annotation effort. A supervised model trained on the 84,000 historical records (if labelled) would likely exceed 90\%+ but requires substantial labelling investment. For a hospital deploying new location names or service types, the LLM approach requires only a prompt update, whereas a trained classifier requires retraining. Geng et al.\ \cite{geng2025} confirm that prompt-based JSON schema enforcement, our chosen approach, can achieve near-zero schema violation rates with appropriate system prompt design.
+\textbf{LLM vs.\ trained classifier for NLI:} Choosing an LLM for NLI was pragmatic. No labelled training data existed at project start; the LLM with an enumerated schema achieved 84\% all-field accuracy without annotation effort. A supervised model trained on the 81,349 historical records (if labelled) would likely exceed 90\%+ but requires substantial labelling investment. For a hospital deploying new location names or service types, the LLM approach requires only a prompt update, whereas a trained classifier requires retraining. Geng et al.\ \cite{geng2025} confirm that prompt-based JSON schema enforcement, our chosen approach, can achieve near-zero schema violation rates with appropriate system prompt design.
 
 \textbf{VRPTW vs.\ simpler formulations:} A simpler assignment formulation (e.g., linear programming with task-porter binary decision variables) would be faster to solve but cannot capture sequential routing constraints --- a porter completing one task and then beginning another. The VRPTW formulation correctly models this and, via the disjunction penalty, ensures all tasks are served. The 1-second solver limit makes the approach responsive enough for real-time use.
 
