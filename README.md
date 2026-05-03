@@ -51,7 +51,7 @@ porter-dispatch-prototype/
 ├── travel_time/
 │   └── travel_times.xlsx      # 89×89 hospital travel time matrix
 ├── report/
-│   ├── main.tex               # Final FYP report (LaTeX, 25 pages)
+│   ├── main.tex               # Final FYP report (LaTeX, 30 pages)
 │   └── main.pdf               # Compiled PDF
 ├── slides/
 │   ├── slides.tex             # Beamer presentation slides (16:9)
@@ -130,7 +130,7 @@ Output written to `simulation_results.csv`. Columns include `mean_pickup_time` a
 
 **Key results:**
 - OR-Tools improves mean total task duration by 2–30% over greedy
-- OR-Tools reduces mean pickup time by **35.8%** at 5 porters, **27.2%** at 7 porters
+- OR-Tools reduces mean pickup time by **35.8%** at 5 porters, **27.1%** at 7 porters
 - At 15 porters, mean pickup time ≈ 15.9 min — near the KPI target
 
 ---
