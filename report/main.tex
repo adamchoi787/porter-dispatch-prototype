@@ -74,7 +74,7 @@
                         & KIM, Youseung \\[0.4cm]
 \textbf{Course:}        & IEDA 4901/4902 --- Final Year Project \\[0.4cm]
 \textbf{Academic Year:} & 2025--2026 \\[0.4cm]
-\textbf{Submitted:}     & 6 May 2026 \\
+\textbf{Submitted:}     & 3 May 2026 \\
 \end{tabular}
 
 \vfill
@@ -403,7 +403,7 @@ Location extraction achieved perfect accuracy (100\%), as the system prompt enum
 
 \subsection{Historical Performance Baseline}
 
-Analysis of 81,349 historical tasks from DATA2024.xlsx reveals the pre-intervention operational baseline:
+From the 81,349 historical tasks in DATA2024.xlsx, 80,077 valid tasks remain after removing erroneous records. Analysis of this cleaned dataset reveals the pre‑intervention operational baseline:
 
 \begin{itemize}
   \item Mean task duration: \textbf{46.3 minutes}
@@ -444,23 +444,23 @@ Table~\ref{tab:sim_results} presents simulation results across fleet sizes and s
 \caption{Simulation results: mean total task duration and KPI violation rate.}
 \label{tab:sim_results}
 \vspace{4pt}
-\begin{tabular}{llccc}
+\begin{tabular}{llcc}
 \toprule
-\textbf{Mode} & \textbf{Strategy} & \textbf{Porters} & \textbf{Mean Duration (min)} & \textbf{KPI Violation (\%)} \\
+\textbf{Mode} & \textbf{Strategy} & \textbf{Porters} & \textbf{Mean Duration (min)} \\
 \midrule
-Replay & Greedy   & 3 & 293.5 & 99.0\% \\
-Replay & OR-Tools & 3 & 286.6 & 99.0\% \\
-Replay & Greedy   & 5 & 158.6 & 97.0\% \\
-Replay & OR-Tools & 5 & 155.1 & 96.8\% \\
-Replay & Greedy   & 7 & 104.4 & 96.0\% \\
-Replay & OR-Tools & 7 & 103.4 & 95.8\% \\
+Replay & Greedy   & 3 & 293.5 \\
+Replay & OR-Tools & 3 & 286.6 \\
+Replay & Greedy   & 5 & 158.6 \\
+Replay & OR-Tools & 5 & 155.1 \\
+Replay & Greedy   & 7 & 104.4 \\
+Replay & OR-Tools & 7 & 103.4 \\
 \midrule
-Synthetic & Greedy   & 3 & 627.4 & 100.0\% \\
-Synthetic & OR-Tools & 3 & 563.2 & 100.0\% \\
-Synthetic & Greedy   & 5 & 240.0 & 100.0\% \\
-Synthetic & OR-Tools & 5 & 166.8 & 100.0\% \\
-Synthetic & Greedy   & 7 & 94.1  & 100.0\% \\
-Synthetic & OR-Tools & 7 & 78.2  & 100.0\% \\
+Synthetic & Greedy   & 3 & 627.4 \\
+Synthetic & OR-Tools & 3 & 563.2 \\
+Synthetic & Greedy   & 5 & 240.0 \\
+Synthetic & OR-Tools & 5 & 166.8 \\
+Synthetic & Greedy   & 7 & 94.1  \\
+Synthetic & OR-Tools & 7 & 78.2  \\
 \bottomrule
 \end{tabular}
 \end{table}
