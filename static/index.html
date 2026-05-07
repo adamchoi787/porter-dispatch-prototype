@@ -234,12 +234,16 @@
                     assigned.forEach(a => {
                         const stops = (a.task && a.task.stops && a.task.stops.length)
                             ? `<div class="text-sm text-gray-600">Stops: ${a.task.stops.join(' → ')}</div>` : '';
+                        const infectionValue = (a.task && a.task.infection_control) ? a.task.infection_control : null;
+                        const infectionFlag = infectionValue
+                            ? `<div class="mt-1 text-sm font-semibold text-red-800 bg-red-100 border border-red-400 rounded p-2">⚠ Infection Control: ${infectionValue} — follow isolation protocol</div>` : '';
                         const card = document.createElement('div');
                         card.className = 'p-3 rounded-lg border border-green-300 bg-green-50';
                         card.innerHTML = `
                             <div class="font-semibold text-green-800">${a.porter_id} — ${a.task ? a.task.service : ''}</div>
                             <div class="text-sm text-gray-600">${a.task ? a.task.from : ''} → ${a.task ? a.task.to : ''} (${a.estimated_duration_mins} min)</div>
                             ${stops}
+                            ${infectionFlag}
                             ${a.explanation ? `<div class="mt-1 text-sm text-blue-800 bg-blue-50 border border-blue-200 rounded p-2"><span class="font-semibold">Why?</span> ${a.explanation}</div>` : ''}
                         `;
                         container.appendChild(card);
